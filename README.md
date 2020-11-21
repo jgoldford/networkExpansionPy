@@ -7,3 +7,13 @@ The package is built from algorithms described in the following papers:
 Goldford J.E. et al, Remnants of an ancient metabolism without phosphate. Cell 168, 1–9, March 9, 2017
 
 Goldford J.E. et al, Environmental boundary conditions for the origin of life converge to an organo-sulfur metabolism. Nature Ecol Evo 3,12 1715-1724, November 11, 2019
+
+## Installation
+
+In a conda or virtual environment, clone git repo and install using pip.
+
+```sh
+git clone https://github.com/jgoldford/networkExpansionPy.git
+cd networkExpansionPy
+pip install -e .
+```
