@@ -65,7 +65,7 @@ class GlobalMetabolicNetwork:
     def __init__(self):
         # load the data
         network = pd.read_csv(asset_path + '/KEGG/network_full.csv')
-        cpds = pd.read_csv(asset_path +'/compounds/cpds.tab',sep='\t')
+        cpds = pd.read_csv(asset_path +'/compounds/cpds.txt',sep='\t')
         thermo = pd.read_csv(asset_path +'/reaction_free_energy/kegg_reactions_CC_ph7.0.csv',sep=',')
         self.network = network
         self.compounds = cpds
@@ -123,8 +123,8 @@ class GlobalMetabolicNetwork:
         dgs = []
         for (rn,direction), dff in self.network.groupby(['rn','direction']):
             effective_deltaG = np.nan
-            if rn in G.thermo['!MiriamID::urn:miriam:kegg.reaction'].tolist():
-                deltaG = G.thermo[G.thermo['!MiriamID::urn:miriam:kegg.reaction'] == rn]['!dG0_prime (kJ/mol)'].values[0]
+            if rn in self.thermo['!MiriamID::urn:miriam:kegg.reaction'].tolist():
+                deltaG = self.thermo[self.thermo['!MiriamID::urn:miriam:kegg.reaction'] == rn]['!dG0_prime (kJ/mol)'].values[0]
                 if direction == 'reverse':
                     deltaG = -1*deltaG
 
