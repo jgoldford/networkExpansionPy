@@ -4,6 +4,7 @@ import pandas as pd
 import ray
 from random import sample
 import os
+from copy import copy, deepcopy
 
 # define asset path
 asset_path,filename = os.path.split(os.path.abspath(__file__))
@@ -12,8 +13,8 @@ asset_path = asset_path + '/assets'
 def netExp(R,P,x,b):
     k = np.sum(x);
     k0 = 0;
-    y = [];
-    
+    n_reactions = np.size(R,1)
+    y = csr_matrix(np.zeros(n_reactions))
     while k > k0:
         k0 = np.sum(x);
         y = (np.dot(R.transpose(),x) == b);
@@ -32,8 +33,8 @@ def netExp_trace(R,P,x,b):
     X.append(x)
     k = np.sum(x);
     k0 = 0;
-    y = [];
-    
+    n_reactions = np.size(R,1)
+    y = csr_matrix(np.zeros(n_reactions))
     Y.append(y)
     
     while k > k0:
@@ -70,8 +71,11 @@ class GlobalMetabolicNetwork:
         self.network = network
         self.compounds = cpds
         self.thermo = thermo
-        self.temperature = 50
+        self.temperature = 25
         self.seedSet = None;
+        
+    def copy(self):
+        return deepcopy(self)
         
     def set_ph(self,pH):
         if ~(type(pH) == str):
@@ -93,7 +97,10 @@ class GlobalMetabolicNetwork:
         balanced = pd.read_csv(asset_path + '/reaction_sets/reactions_balanced.csv')
         self.network = self.network[self.network.rn.isin(balanced.rn.tolist())]
         
-    
+    def subnetwork(self,rxns):
+        # only keep reactions that are in list
+        self.network = self.network[self.network.rn.isin(rxns)]
+        
     def convertToIrreversible(self):
         network = self.network
         rn = network[['rn']]
@@ -113,7 +120,6 @@ class GlobalMetabolicNetwork:
         self.network['ub'] = ub
         self.network['lb'] = lb
       
-    
     def pruneThermodynamicallyInfeasibleReactions(self,keepnan = False):
         fixed_mets = ['C00001','C00080']
 
@@ -148,12 +154,43 @@ class GlobalMetabolicNetwork:
         self.network = res.join(self.network.set_index(['rn','direction'])).reset_index()
     
     def initialize_metabolite_vector(self,seedSet):
-        if self.seedSet is None:
+        if seedSet is None:
             print('No seed set')
         else:
             network = self.network.pivot_table(index='cid',columns = ['rn','direction'],values='s').fillna(0)
             x0 = np.array([x in seedSet for x in network.index.get_level_values(0)]) * 1;        
             return x0
         
-    
+    def expand(self,seedSet):
+        # constructre network from skinny table and create matricies for NE algorithm
+        x0 = self.initialize_metabolite_vector(seedSet)
+        network = self.network.pivot_table(index='cid',columns = ['rn','direction'],values='s').fillna(0)
+        S = network.values
+        R = (S < 0)*1
+        P = (S > 0)*1
+        b = sum(R)
+
+        # sparsefy data
+        R = csr_matrix(R)
+        P = csr_matrix(P)
+        b = csr_matrix(b)
+        b = b.transpose()
+
+        x0 = csr_matrix(x0)
+        x0 = x0.transpose()
+        x,y = netExp(R,P,x0,b)
+        # convert to list of metabolite ids and reaction ids
+        if x.toarray()[0].sum() > 0:
+            cidx = np.where(x.toarray().T[0])[0]
+            compounds = network.iloc[cidx].index.get_level_values(0).tolist()
+        else:
+            compounds = []
+            
+        if y.toarray()[0].sum() > 0:
+            ridx = np.where(y.toarray().T[0])[0]
+            reactions = list(network.iloc[:,ridx])
+        else:
+            reactions = [];
+            
+        return compounds,reactions
 

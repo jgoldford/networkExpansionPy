@@ -1,4 +1,5 @@
 README.md
+setup.py
 networkExpansionPy/__init__.py
 networkExpansionPy/lib.py
 networkExpansionPy.egg-info/PKG-INFO
