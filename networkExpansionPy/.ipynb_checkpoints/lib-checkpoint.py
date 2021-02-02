@@ -25,6 +25,28 @@ def netExp(R,P,x,b):
         k = np.sum(x);
     return x,y
 
+# define a new network expansion, s.t. stopping criteria is now no new compounds or reactions can be added at subsequent iterations
+def netExp_cr(R,P,x,b):
+    k = np.sum(x);
+    k0 = 0;
+    n_reactions = np.size(R,1)
+    y = csr_matrix(np.zeros(n_reactions))
+    l = 0
+    l0 = 0;
+        
+    while (k > k0) | (l > l0):
+        k0 = np.sum(x);
+        l0 = np.sum(y)
+        y = (np.dot(R.transpose(),x) == b);
+        y = y.astype('int');
+        x_n = np.dot(P,y) + x;
+        x_n = x_n.astype('bool');
+        x = x_n.astype('int');
+        k = np.sum(x);
+        l = np.sum(y)
+    return x,y
+
+
 def netExp_trace(R,P,x,b):
     
     X = []
@@ -161,7 +183,7 @@ class GlobalMetabolicNetwork:
             x0 = np.array([x in seedSet for x in network.index.get_level_values(0)]) * 1;        
             return x0
         
-    def expand(self,seedSet):
+    def expand(self,seedSet,algorithm='naive'):
         # constructre network from skinny table and create matricies for NE algorithm
         x0 = self.initialize_metabolite_vector(seedSet)
         network = self.network.pivot_table(index='cid',columns = ['rn','direction'],values='s').fillna(0)
@@ -178,15 +200,22 @@ class GlobalMetabolicNetwork:
 
         x0 = csr_matrix(x0)
         x0 = x0.transpose()
-        x,y = netExp(R,P,x0,b)
+        if algorithm.lower() == 'naive':
+            x,y = netExp(R,P,x0,b)
+        elif algorithm.lower() == 'cr':
+            x,y = netExp_cr(R,P,x0,b)
+        else:
+            raise ValueError('algorithm needs to be naive (compound stopping criteria) or cr (reaction/compound stopping criteria)')
+        
         # convert to list of metabolite ids and reaction ids
-        if x.toarray()[0].sum() > 0:
+        if x.toarray().sum() > 0:
             cidx = np.where(x.toarray().T[0])[0]
             compounds = network.iloc[cidx].index.get_level_values(0).tolist()
         else:
             compounds = []
             
-        if y.toarray()[0].sum() > 0:
+        if y.toarray().sum() > 0:
+            ridx = np.where(y.toarray().T[0])[0]
             ridx = np.where(y.toarray().T[0])[0]
             reactions = list(network.iloc[:,ridx])
         else:
