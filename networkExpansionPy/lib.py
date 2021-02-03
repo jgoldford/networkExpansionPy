@@ -83,6 +83,15 @@ def parse_reaction_trace(reaction_trace,network):
     rxns_list = pd.concat(rxns_list,axis=0)
     return rxns_list
 
+
+def isRxnCoenzymeCoupled(rxn,cosubstrate,coproduct):
+    g = rxn[rxn.cid.isin([cosubstrate,coproduct])]
+    out = False
+    if len(g) > 1:
+        if g.s.sum() == 0:
+            out = True
+    return out
+
 class GlobalMetabolicNetwork:
     
     def __init__(self):
@@ -123,6 +132,32 @@ class GlobalMetabolicNetwork:
         # only keep reactions that are in list
         self.network = self.network[self.network.rn.isin(rxns)]
         
+    def addGenericCoenzymes(self):
+        replace_metabolites = {'C00003': 'Generic_oxidant', 'C00004': 'Generic_reductant', 'C00006': 'Generic_oxidant',  'C00005': 'Generic_reductant','C00016': 'Generic_oxidant','C01352':'Generic_reductant'}
+        coenzyme_pairs = {}
+        coenzyme_pairs['NAD'] = ['C00003','C00004']
+        coenzyme_pairs['NADP'] = ['C00006','C00005']
+        coenzyme_pairs['FAD'] = ['C00016','C01352']
+        coenzyme_pairs = pd.DataFrame(coenzyme_pairs).T.reset_index()
+        coenzyme_pairs.columns = ['id','oxidant','reductant']
+        # create reactions copies with coenzyme pairs
+        new_rxns = []
+        new_thermo = [];
+        for idx,rxn in self.network.groupby('rn'):
+            z = any([isRxnCoenzymeCoupled(rxn,row.oxidant,row.reductant) for x,row in coenzyme_pairs.iterrows()])
+            if z:
+                new_rxn = rxn.replace(replace_metabolites).groupby(['cid','rn']).sum().reset_index()
+                new_rxn['rn'] = new_rxn['rn'] = idx + '_G'
+                new_rxns.append(new_rxn)
+                t = self.thermo[self.thermo['!MiriamID::urn:miriam:kegg.reaction'] == idx].replace({idx:  idx + '_G'})
+                new_thermo.append(t)
+
+        new_rxns = pd.concat(new_rxns,axis=0)
+        new_thermo = pd.concat(new_thermo,axis=0)
+
+        self.network = pd.concat([self.network,new_rxns],axis=0)
+        self.thermo = pd.concat([self.thermo,new_thermo],axis=0)
+    
     def convertToIrreversible(self):
         network = self.network
         rn = network[['rn']]
