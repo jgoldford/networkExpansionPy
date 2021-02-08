@@ -6,13 +6,14 @@ import pandas as pd
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-o", "--output", type=str,
-                    help="path to output results")
 parser.add_argument("-s", "--simulation_id", type=str,
                     help="unique id for each random simulation; will be saved to a table on the scc")
 
 # parse the arguments
+
 #outFilePath = args.output
+
+root_path = '/projectnb/bioinfor/SEGRE/goldford/network_expansion/networkExpansionPy'
 outFilePath = root_path + '/fold_expansion_scc/results/'
 sid = args.simulation_id
 foldOrderTableFile = outFilePath + 'fold_table/ft_' + sid + '.csv'
