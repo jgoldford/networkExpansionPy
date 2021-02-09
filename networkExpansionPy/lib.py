@@ -95,20 +95,23 @@ def isRxnCoenzymeCoupled(rxn,cosubstrate,coproduct):
 
 def load_ecg_network(ecg):
     network_list = []
+    consistent_rids = []
     for rid,v in ecg["reactions"].items():
         cids = v["left"] + v["right"]
-        try:
+        try: ## This skips all reactions with n stoichiometries
             stoichs = [-int(i) for i in v["metadata"]["left_stoichiometries"]]+[int(i) for i in v["metadata"]["right_stoichiometries"]]
             network_list+=list(zip(cids,[rid for _ in range(len(stoichs))],stoichs))
         except:
             pass
-    return pd.DataFrame(network_list,columns=("cid","rn","s"))
+        if v["metadata"]["element_conservation"]==True:
+            consistent_rids.append(rid)
+    return pd.DataFrame(network_list,columns=("cid","rn","s")), pd.DataFrame(consistent_rids,columns=["rn"])
 
-def load_ecg_thermo(ecg):
+def load_ecg_thermo(ecg,ph=9):
     thermo_list = []
     for rid,v in ecg["reactions"].items():
         
-        phkey = "9pH_100mM"
+        phkey = str(ph)+"pH_100mM"
         
         if v["metadata"]["dg"][phkey]["standard_dg_prime_value"] == None:
             dg = np.nan
@@ -144,19 +147,20 @@ class GlobalMetabolicNetwork:
             cpds = pd.read_csv(asset_path +'/compounds/cpds.txt',sep='\t')
             thermo = pd.read_csv(asset_path +'/reaction_free_energy/kegg_reactions_CC_ph7.0.csv',sep=',')
             self.compounds = cpds
+            self.ecg = None
         else:
             with open(ecg_json) as f:
                 ecg = json.load(f)
-            network = load_ecg_network(ecg)
+            network, consistent_rxns = load_ecg_network(ecg)
             thermo = load_ecg_thermo(ecg)
             self.ecg = ecg
+            self.consistent_rxns = consistent_rxns
+            ## self.compounds appears not to be used so it's not included here
 
         self.network = network
-        self.compounds = cpds
         self.thermo = thermo
         self.temperature = 25
         self.seedSet = None
-        self.ecg = None
         
     def copy(self):
         return deepcopy(self)
@@ -164,17 +168,26 @@ class GlobalMetabolicNetwork:
     def set_ph(self,pH):
         if ~(type(pH) == str):
             pH = str(pH)
-        try:
-            thermo = pd.read_csv(asset_path + '/reaction_free_energy/kegg_reactions_CC_ph' + pH + '.csv',sep=',')
-            self.thermo = thermo
-        except Exception as error:
-            print('Failed to open pH files (please use 5.0-9.0 in 0.5 increments)')    
-    
+        if self.ecg == None:
+            try:
+                thermo = pd.read_csv(asset_path + '/reaction_free_energy/kegg_reactions_CC_ph' + pH + '.csv',sep=',')
+                self.thermo = thermo
+            except Exception as error:
+                print('Failed to open pH files (please use 5.0-9.0 in 0.5 increments)')    
+        else:
+            try:
+                self.thermo = load_ecg_thermo(self.ecg,pH)
+            except:
+                raise ValueError("Try another pH, that one appears not to be in the ecg json")
+
     
     def pruneInconsistentReactions(self):
         # remove reactions with qualitatively different sets of elements in reactions and products
-        consistent = pd.read_csv(asset_path + '/reaction_sets/reactions_consistent.csv')
-        self.network = self.network[self.network.rn.isin(consistent.rn.tolist())]
+        if self.ecg==None:
+            consistent = pd.read_csv(asset_path + '/reaction_sets/reactions_consistent.csv')
+            self.network = self.network[self.network.rn.isin(consistent.rn.tolist())]
+        else:
+            self.network = self.network[self.network.rn.isin(self.consistent_rxns.rn.tolist())]
         
     def pruneUnbalancedReactions(self):
         # only keep reactions that are elementally balanced
