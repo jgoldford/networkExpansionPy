@@ -104,6 +104,37 @@ def load_ecg_network(ecg):
             pass
     return pd.DataFrame(network_list,columns=("cid","rn","s"))
 
+def load_ecg_thermo(ecg):
+    thermo_list = []
+    for rid,v in ecg["reactions"].items():
+        
+        phkey = "9pH_100mM"
+        
+        if v["metadata"]["dg"][phkey]["standard_dg_prime_value"] == None:
+            dg = np.nan
+        else:
+            dg = v["metadata"]["dg"][phkey]["standard_dg_prime_value"]
+            
+        if v["metadata"]["dg"][phkey]["standard_dg_prime_error"] == None:
+            dgerror = np.nan
+        else:
+            dgerror = v["metadata"]["dg"][phkey]["standard_dg_prime_error"]
+            
+        if v["metadata"]["dg"][phkey]["is_uncertain"] == None:
+            note = "uncertainty is too high"
+        else:
+            note = np.nan
+
+        thermo_list.append((rid,
+            dg,
+            dgerror,
+            v["metadata"]["dg"][phkey]["p_h"],
+            v["metadata"]["dg"][phkey]["ionic_strength"]/1000,
+            v["metadata"]["dg"][phkey]["temperature"],
+            note)) 
+
+    return pd.DataFrame(thermo_list, columns = ("!MiriamID::urn:miriam:kegg.reaction","!dG0_prime (kJ/mol)","!sigma[dG0] (kJ/mol)","!pH","!I (mM)","!T (Kelvin)","!Note"))         
+
 class GlobalMetabolicNetwork:
     
     def __init__(self,ecg_json=None):
@@ -112,19 +143,20 @@ class GlobalMetabolicNetwork:
             network = pd.read_csv(asset_path + '/KEGG/network_full.csv')
             cpds = pd.read_csv(asset_path +'/compounds/cpds.txt',sep='\t')
             thermo = pd.read_csv(asset_path +'/reaction_free_energy/kegg_reactions_CC_ph7.0.csv',sep=',')
-            self.network = network
             self.compounds = cpds
-            self.thermo = thermo
-            self.temperature = 25
-            self.seedSet = None
-            self.ecg = None
         else:
             with open(ecg_json) as f:
                 ecg = json.load(f)
             network = load_ecg_network(ecg)
             thermo = load_ecg_thermo(ecg)
-
             self.ecg = ecg
+
+        self.network = network
+        self.compounds = cpds
+        self.thermo = thermo
+        self.temperature = 25
+        self.seedSet = None
+        self.ecg = None
         
     def copy(self):
         return deepcopy(self)
@@ -141,7 +173,6 @@ class GlobalMetabolicNetwork:
     
     def pruneInconsistentReactions(self):
         # remove reactions with qualitatively different sets of elements in reactions and products
-        
         consistent = pd.read_csv(asset_path + '/reaction_sets/reactions_consistent.csv')
         self.network = self.network[self.network.rn.isin(consistent.rn.tolist())]
         
