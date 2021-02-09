@@ -4,6 +4,7 @@ import pandas as pd
 import ray
 from random import sample
 import os
+import json
 from copy import copy, deepcopy
 
 # define asset path
@@ -92,18 +93,38 @@ def isRxnCoenzymeCoupled(rxn,cosubstrate,coproduct):
             out = True
     return out
 
+def load_ecg_network(ecg):
+    network_list = []
+    for rid,v in ecg["reactions"].items():
+        cids = v["left"] + v["right"]
+        try:
+            stoichs = [-int(i) for i in v["metadata"]["left_stoichiometries"]]+[int(i) for i in v["metadata"]["right_stoichiometries"]]
+            network_list+=list(zip(cids,[rid for _ in range(len(stoichs))],stoichs))
+        except:
+            pass
+    return pd.DataFrame(network_list,columns=("cid","rn","s"))
+
 class GlobalMetabolicNetwork:
     
-    def __init__(self):
+    def __init__(self,ecg_json=None):
         # load the data
-        network = pd.read_csv(asset_path + '/KEGG/network_full.csv')
-        cpds = pd.read_csv(asset_path +'/compounds/cpds.txt',sep='\t')
-        thermo = pd.read_csv(asset_path +'/reaction_free_energy/kegg_reactions_CC_ph7.0.csv',sep=',')
-        self.network = network
-        self.compounds = cpds
-        self.thermo = thermo
-        self.temperature = 25
-        self.seedSet = None;
+        if ecg_json == None:
+            network = pd.read_csv(asset_path + '/KEGG/network_full.csv')
+            cpds = pd.read_csv(asset_path +'/compounds/cpds.txt',sep='\t')
+            thermo = pd.read_csv(asset_path +'/reaction_free_energy/kegg_reactions_CC_ph7.0.csv',sep=',')
+            self.network = network
+            self.compounds = cpds
+            self.thermo = thermo
+            self.temperature = 25
+            self.seedSet = None
+            self.ecg = None
+        else:
+            with open(ecg_json) as f:
+                ecg = json.load(f)
+            network = load_ecg_network(ecg)
+            thermo = load_ecg_thermo(ecg)
+
+            self.ecg = ecg
         
     def copy(self):
         return deepcopy(self)
@@ -120,6 +141,7 @@ class GlobalMetabolicNetwork:
     
     def pruneInconsistentReactions(self):
         # remove reactions with qualitatively different sets of elements in reactions and products
+        
         consistent = pd.read_csv(asset_path + '/reaction_sets/reactions_consistent.csv')
         self.network = self.network[self.network.rn.isin(consistent.rn.tolist())]
         
