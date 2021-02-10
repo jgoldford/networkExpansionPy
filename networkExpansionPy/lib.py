@@ -103,7 +103,12 @@ class GlobalMetabolicNetwork:
         self.compounds = cpds
         self.thermo = thermo
         self.temperature = 25
-        self.seedSet = None;
+        self.seedSet = None
+        self.rid_to_idx = None
+        self.idx_to_rid = None
+        self.cid_to_idx = None
+        self.idx_to_cid = None
+
         
     def copy(self):
         return deepcopy(self)
@@ -214,15 +219,46 @@ class GlobalMetabolicNetwork:
         if seedSet is None:
             print('No seed set')
         else:
-            network = self.network.pivot_table(index='cid',columns = ['rn','direction'],values='s').fillna(0)
-            x0 = np.array([x in seedSet for x in network.index.get_level_values(0)]) * 1;        
+            x0 = np.zeros([len(self.cid_to_idx)],dtype=int)
+            for x in seedSet:
+                x0[self.cid_to_idx[x]] = 1     
             return x0
+
+    def create_reaction_dicts(self):
+        rids = set(zip(self.network["rn"],self.network["direction"]))
+        rid_to_idx = dict()
+        idx_to_rid = dict()
+        for v, k in enumerate(rids):
+            rid_to_idx[k] = v
+            idx_to_rid[v] = k
+        
+        return rid_to_idx, idx_to_rid
+
+    def create_compound_dicts(self):
+        cids = set(self.network["cid"])
+        cid_to_idx = dict()
+        idx_to_cid = dict()
+        for v, k in enumerate(cids):
+            cid_to_idx[k] = v
+            idx_to_cid[v] = k
+        
+        return cid_to_idx, idx_to_cid
+
+    def create_S_from_irreversible_network(self):
+        
+        S = np.zeros([len(self.cid_to_idx),len(self.rid_to_idx)])
+            
+        for c,r,d,s in zip(self.network["cid"],self.network["rn"],self.network["direction"],self.network["s"]):
+            S[self.cid_to_idx[c],self.rid_to_idx[(r,d)]] = s
+
+        return S
         
     def expand(self,seedSet,algorithm='naive'):
         # constructre network from skinny table and create matricies for NE algorithm
+        self.rid_to_idx, self.idx_to_rid = self.create_reaction_dicts()
+        self.cid_to_idx, self.idx_to_cid = self.create_compound_dicts()
         x0 = self.initialize_metabolite_vector(seedSet)
-        network = self.network.pivot_table(index='cid',columns = ['rn','direction'],values='s').fillna(0)
-        S = network.values
+        S = self.create_S_from_irreversible_network()
         R = (S < 0)*1
         P = (S > 0)*1
         b = sum(R)
@@ -244,15 +280,14 @@ class GlobalMetabolicNetwork:
         
         # convert to list of metabolite ids and reaction ids
         if x.toarray().sum() > 0:
-            cidx = np.where(x.toarray().T[0])[0]
-            compounds = network.iloc[cidx].index.get_level_values(0).tolist()
+            cidx = np.nonzero(x.toarray().T[0])[0]
+            compounds = [self.idx_to_cid[i] for i in cidx]
         else:
             compounds = []
             
         if y.toarray().sum() > 0:
-            ridx = np.where(y.toarray().T[0])[0]
-            ridx = np.where(y.toarray().T[0])[0]
-            reactions = list(network.iloc[:,ridx])
+            ridx = np.nonzero(y.toarray().T[0])[0]
+            reactions = [self.idx_to_rid[i] for i in ridx]
         else:
             reactions = [];
             
