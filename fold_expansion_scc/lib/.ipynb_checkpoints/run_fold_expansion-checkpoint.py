@@ -12,6 +12,7 @@ parser.add_argument("-s", "--simulation_id", type=str,
 # parse the arguments
 
 #outFilePath = args.output
+args = parser.parse_args()
 
 root_path = '/projectnb/bioinfor/SEGRE/goldford/network_expansion/networkExpansionPy'
 outFilePath = root_path + '/fold_expansion_scc/results/'
@@ -56,8 +57,9 @@ fold_remove = []
 for key,values in fold_dict.items():
     if all([x not in mrxns for x in values]):
         fold_remove.append(key)
-        
 
+# remove all rules with folds that are not used in metabolic network or are erroneous
+fold_remove = fold_remove + ['PDBChainNotFound']
 # remove folds that are not included in metabolic network at all
 fold_rules.removeFolds(fold_remove)
 
