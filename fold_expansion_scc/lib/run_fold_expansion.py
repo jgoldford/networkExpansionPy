@@ -12,6 +12,7 @@ parser.add_argument("-s", "--simulation_id", type=str,
 # parse the arguments
 
 #outFilePath = args.output
+args = parser.parse_args()
 
 root_path = '/projectnb/bioinfor/SEGRE/goldford/network_expansion/networkExpansionPy'
 outFilePath = root_path + '/fold_expansion_scc/results/'
@@ -56,13 +57,15 @@ fold_remove = []
 for key,values in fold_dict.items():
     if all([x not in mrxns for x in values]):
         fold_remove.append(key)
-        
 
+# remove all rules with folds that are not used in metabolic network or are erroneous
+fold_remove = fold_remove + ['PDBChainNotFound']
 # remove folds that are not included in metabolic network at all
 fold_rules.removeFolds(fold_remove)
 
 # define a random permutation on the folds
 folds = list(fold_rules.folds)
+
 idx = np.random.permutation(len(folds))
 fold_order = [folds[i] for i in idx]
 
@@ -82,7 +85,9 @@ rxns_iteration = {'rn': list(rxn_set) , 'iteration' : [iteration for x in rxn_se
 for fold in fold_order:
     
     iteration = iteration + 1;
+    
     fold_set = fold_set.union(set([fold]))
+    
     c,re,rf = fold_expansion(metabolism,fold_rules,fold_set,cpd_set,rxn_set)
     c = set(c); re = set(re); rf = set(rf)
     
