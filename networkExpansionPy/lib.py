@@ -269,7 +269,8 @@ class GlobalMetabolicNetwork:
         if ~keepnan:
             res = res.dropna()
         
-        res = res[res['effDeltaG'] < 0].set_index(['rn','direction'])
+        #res = res[res['effDeltaG'] < 0].set_index(['rn','direction'])
+        res = res[~(res['effDeltaG'] > 0)].set_index(['rn','direction'])
         res = res.drop('effDeltaG',axis=1)
         self.network = res.join(self.network.set_index(['rn','direction'])).reset_index()
     
