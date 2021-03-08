@@ -117,7 +117,7 @@ class GlobalMetabolicNetwork:
             thermo = pd.read_csv(asset_path +'/reaction_free_energy/kegg_reactions_CC_ph7.0.csv',sep=',')
             self.network = network
             self.thermo = thermo
-            self.compounds = cpds
+            self.compounds = cpds ## Includes many compounds without reactions
             self.ecg = None
         else:
             with open(ecg_json) as f:
@@ -126,7 +126,7 @@ class GlobalMetabolicNetwork:
             self.network = network
             self.ecg = ecg
             self.consistent_rxns = consistent_rxns
-            self.compounds = pd.DataFrame(self.network["cid"].unique(),columns=["cid"])
+            self.compounds = pd.DataFrame(self.network["cid"].unique(),columns=["cid"]) ## Only includes compounds with reactions
 
         self.temperature = 25
         self.seedSet = None
@@ -134,6 +134,7 @@ class GlobalMetabolicNetwork:
         self.idx_to_rid = None
         self.cid_to_idx = None
         self.idx_to_cid = None
+        self.S = None
         
     def copy(self):
         return deepcopy(self)
@@ -318,12 +319,15 @@ class GlobalMetabolicNetwork:
         
     def expand(self,seedSet,algorithm='naive'):
         # constructre network from skinny table and create matricies for NE algorithm
-        self.rid_to_idx, self.idx_to_rid = self.create_reaction_dicts()
-        self.cid_to_idx, self.idx_to_cid = self.create_compound_dicts()
+        if (not self.rid_to_idx) or (not self.idx_to_rid):
+            self.rid_to_idx, self.idx_to_rid = self.create_reaction_dicts()
+        if (not self.cid_to_idx) or (not self.idx_to_cid):
+            self.cid_to_idx, self.idx_to_cid = self.create_compound_dicts()
+        if not self.S:
+            self.S = self.create_S_from_irreversible_network()
         x0 = self.initialize_metabolite_vector(seedSet)
-        S = self.create_S_from_irreversible_network()
-        R = (S < 0)*1
-        P = (S > 0)*1
+        R = (self.S < 0)*1
+        P = (self.S > 0)*1
         b = sum(R)
 
         # sparsefy data
