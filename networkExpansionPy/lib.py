@@ -107,37 +107,6 @@ def load_ecg_network(ecg):
             consistent_rids.append(rid)
     return pd.DataFrame(network_list,columns=("cid","rn","s")), pd.DataFrame(consistent_rids,columns=["rn"])
 
-# def load_ecg_thermo(ecg,ph=9):
-#     thermo_list = []
-#     for rid,v in ecg["reactions"].items():
-        
-#         phkey = str(ph)+"pH_100mM"
-        
-#         if v["metadata"]["dg"][phkey]["standard_dg_prime_value"] == None:
-#             dg = np.nan
-#         else:
-#             dg = v["metadata"]["dg"][phkey]["standard_dg_prime_value"]
-            
-#         if v["metadata"]["dg"][phkey]["standard_dg_prime_error"] == None:
-#             dgerror = np.nan
-#         else:
-#             dgerror = v["metadata"]["dg"][phkey]["standard_dg_prime_error"]
-            
-#         if v["metadata"]["dg"][phkey]["is_uncertain"] == None:
-#             note = "uncertainty is too high"
-#         else:
-#             note = np.nan
-
-#         thermo_list.append((rid,
-#             dg,
-#             dgerror,
-#             v["metadata"]["dg"][phkey]["p_h"],
-#             v["metadata"]["dg"][phkey]["ionic_strength"]/1000,
-#             v["metadata"]["dg"][phkey]["temperature"],
-#             note)) 
-
-#     return pd.DataFrame(thermo_list, columns = ("!MiriamID::urn:miriam:kegg.reaction","!dG0_prime (kJ/mol)","!sigma[dG0] (kJ/mol)","!pH","!I (mM)","!T (Kelvin)","!Note"))         
-
 class GlobalMetabolicNetwork:
     
     def __init__(self,ecg_json=None):
