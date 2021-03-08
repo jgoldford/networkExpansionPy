@@ -124,7 +124,7 @@ class GlobalMetabolicNetwork:
             network, consistent_rxns = load_ecg_network(ecg)
             self.ecg = ecg
             self.consistent_rxns = consistent_rxns
-            ## self.compounds appears not to be used so it's not included here
+            self.compounds = pd.DataFrame(self.network["cid"].unique(),columns=["cid"])
 
         self.network = network
         self.temperature = 25
