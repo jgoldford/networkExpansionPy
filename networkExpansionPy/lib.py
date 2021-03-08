@@ -115,6 +115,7 @@ class GlobalMetabolicNetwork:
             network = pd.read_csv(asset_path + '/KEGG/network_full.csv')
             cpds = pd.read_csv(asset_path +'/compounds/cpds.txt',sep='\t')
             thermo = pd.read_csv(asset_path +'/reaction_free_energy/kegg_reactions_CC_ph7.0.csv',sep=',')
+            self.network = network
             self.thermo = thermo
             self.compounds = cpds
             self.ecg = None
@@ -122,11 +123,11 @@ class GlobalMetabolicNetwork:
             with open(ecg_json) as f:
                 ecg = json.load(f)
             network, consistent_rxns = load_ecg_network(ecg)
+            self.network = network
             self.ecg = ecg
             self.consistent_rxns = consistent_rxns
             self.compounds = pd.DataFrame(self.network["cid"].unique(),columns=["cid"])
 
-        self.network = network
         self.temperature = 25
         self.seedSet = None
         self.rid_to_idx = None
