@@ -319,11 +319,11 @@ class GlobalMetabolicNetwork:
         
     def expand(self,seedSet,algorithm='naive'):
         # constructre network from skinny table and create matricies for NE algorithm
-        # if (not self.rid_to_idx) or (not self.idx_to_rid):
+        # if (self.rid_to_idx is None) or (self.idx_to_rid is None):
         self.rid_to_idx, self.idx_to_rid = self.create_reaction_dicts()
-        # if (not self.cid_to_idx) or (not self.idx_to_cid):
+        # if (self.cid_to_idx is None) or (self.idx_to_cid is None):
         self.cid_to_idx, self.idx_to_cid = self.create_compound_dicts()
-        # if not self.S:
+        # if self.S is None:
         self.S = self.create_S_from_irreversible_network()
         x0 = self.initialize_metabolite_vector(seedSet)
         R = (self.S < 0)*1
