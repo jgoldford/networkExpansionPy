@@ -107,37 +107,6 @@ def load_ecg_network(ecg):
             consistent_rids.append(rid)
     return pd.DataFrame(network_list,columns=("cid","rn","s")), pd.DataFrame(consistent_rids,columns=["rn"])
 
-def load_ecg_thermo(ecg,ph=9):
-    thermo_list = []
-    for rid,v in ecg["reactions"].items():
-        
-        phkey = str(ph)+"pH_100mM"
-        
-        if v["metadata"]["dg"][phkey]["standard_dg_prime_value"] == None:
-            dg = np.nan
-        else:
-            dg = v["metadata"]["dg"][phkey]["standard_dg_prime_value"]
-            
-        if v["metadata"]["dg"][phkey]["standard_dg_prime_error"] == None:
-            dgerror = np.nan
-        else:
-            dgerror = v["metadata"]["dg"][phkey]["standard_dg_prime_error"]
-            
-        if v["metadata"]["dg"][phkey]["is_uncertain"] == None:
-            note = "uncertainty is too high"
-        else:
-            note = np.nan
-
-        thermo_list.append((rid,
-            dg,
-            dgerror,
-            v["metadata"]["dg"][phkey]["p_h"],
-            v["metadata"]["dg"][phkey]["ionic_strength"]/1000,
-            v["metadata"]["dg"][phkey]["temperature"],
-            note)) 
-
-    return pd.DataFrame(thermo_list, columns = ("!MiriamID::urn:miriam:kegg.reaction","!dG0_prime (kJ/mol)","!sigma[dG0] (kJ/mol)","!pH","!I (mM)","!T (Kelvin)","!Note"))         
-
 class GlobalMetabolicNetwork:
     
     def __init__(self,ecg_json=None):
@@ -146,25 +115,26 @@ class GlobalMetabolicNetwork:
             network = pd.read_csv(asset_path + '/KEGG/network_full.csv')
             cpds = pd.read_csv(asset_path +'/compounds/cpds.txt',sep='\t')
             thermo = pd.read_csv(asset_path +'/reaction_free_energy/kegg_reactions_CC_ph7.0.csv',sep=',')
-            self.compounds = cpds
+            self.network = network
+            self.thermo = thermo
+            self.compounds = cpds ## Includes many compounds without reactions
             self.ecg = None
         else:
             with open(ecg_json) as f:
                 ecg = json.load(f)
             network, consistent_rxns = load_ecg_network(ecg)
-            thermo = load_ecg_thermo(ecg)
+            self.network = network
             self.ecg = ecg
             self.consistent_rxns = consistent_rxns
-            ## self.compounds appears not to be used so it's not included here
+            self.compounds = pd.DataFrame(self.network["cid"].unique(),columns=["cid"]) ## Only includes compounds with reactions
 
-        self.network = network
-        self.thermo = thermo
         self.temperature = 25
         self.seedSet = None
         self.rid_to_idx = None
         self.idx_to_rid = None
         self.cid_to_idx = None
         self.idx_to_cid = None
+        self.S = None
         
     def copy(self):
         return deepcopy(self)
@@ -183,6 +153,37 @@ class GlobalMetabolicNetwork:
                 self.thermo = load_ecg_thermo(self.ecg,pH)
             except:
                 raise ValueError("Try another pH, that one appears not to be in the ecg json")
+
+    def load_ecg_thermo(self,ph=9):
+        thermo_list = []
+        for rid,v in self.ecg["reactions"].items():
+            
+            phkey = str(ph)+"pH_100mM"
+            
+            if v["metadata"]["dg"][phkey]["standard_dg_prime_value"] == None:
+                dg = np.nan
+            else:
+                dg = v["metadata"]["dg"][phkey]["standard_dg_prime_value"]
+                
+            if v["metadata"]["dg"][phkey]["standard_dg_prime_error"] == None:
+                dgerror = np.nan
+            else:
+                dgerror = v["metadata"]["dg"][phkey]["standard_dg_prime_error"]
+                
+            if v["metadata"]["dg"][phkey]["is_uncertain"] == None:
+                note = "uncertainty is too high"
+            else:
+                note = np.nan
+
+            thermo_list.append((rid,
+                dg,
+                dgerror,
+                v["metadata"]["dg"][phkey]["p_h"],
+                v["metadata"]["dg"][phkey]["ionic_strength"]/1000,
+                v["metadata"]["dg"][phkey]["temperature"],
+                note)) 
+
+        return pd.DataFrame(thermo_list, columns = ("!MiriamID::urn:miriam:kegg.reaction","!dG0_prime (kJ/mol)","!sigma[dG0] (kJ/mol)","!pH","!I (mM)","!T (Kelvin)","!Note"))         
 
     
     def pruneInconsistentReactions(self):
@@ -283,7 +284,7 @@ class GlobalMetabolicNetwork:
             print('No seed set')
         else:
             x0 = np.zeros([len(self.cid_to_idx)],dtype=int)
-            for x in seedSet:
+            for x in set(seedSet)&set(self.cid_to_idx.keys()):
                 x0[self.cid_to_idx[x]] = 1     
             return x0
 
@@ -318,12 +319,15 @@ class GlobalMetabolicNetwork:
         
     def expand(self,seedSet,algorithm='naive'):
         # constructre network from skinny table and create matricies for NE algorithm
+        # if (self.rid_to_idx is None) or (self.idx_to_rid is None):
         self.rid_to_idx, self.idx_to_rid = self.create_reaction_dicts()
+        # if (self.cid_to_idx is None) or (self.idx_to_cid is None):
         self.cid_to_idx, self.idx_to_cid = self.create_compound_dicts()
+        # if self.S is None:
+        self.S = self.create_S_from_irreversible_network()
         x0 = self.initialize_metabolite_vector(seedSet)
-        S = self.create_S_from_irreversible_network()
-        R = (S < 0)*1
-        P = (S > 0)*1
+        R = (self.S < 0)*1
+        P = (self.S > 0)*1
         b = sum(R)
 
         # sparsefy data
