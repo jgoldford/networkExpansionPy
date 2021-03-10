@@ -157,20 +157,17 @@ class GlobalMetabolicNetwork:
 
         self.network = pd.concat([self.network,new_rxns],axis=0)
         self.thermo = pd.concat([self.thermo,new_thermo],axis=0)
+
     
     def convertToIrreversible(self):
-        network = self.network
-        rn = network[['rn']]
-        cid = network[['cid']]
-        s = network[['s']]
-        rn_f = rn + ''
-        rn_b = rn + ''
-        rn_f['direction'] = 'forward'
-        rn_b['direction'] = 'reverse'
-        
-        nf = cid.join(rn_f).join(s)
-        nb = cid.join(rn_b).join(-s)
-        self.network = pd.concat([nf,nb],axis=0) 
+        nf = self.network.copy()
+        nb = self.network.copy()
+        nf['direction'] = 'forward'
+        nb['direction'] = 'reverse'
+        nb['s'] = -nb['s']
+        net = pd.concat([nf,nb],axis=0)
+        net = net.set_index(['cid','rn','direction']).reset_index()
+        self.network = net
     
     def setMetaboliteBounds(self,ub = 1e-1,lb = 1e-6): 
         

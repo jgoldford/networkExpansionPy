@@ -4,6 +4,7 @@ import pandas as pd
 import ray
 from random import sample
 import os
+import json
 from copy import copy, deepcopy
 
 # define asset path
@@ -92,18 +93,48 @@ def isRxnCoenzymeCoupled(rxn,cosubstrate,coproduct):
             out = True
     return out
 
+def load_ecg_network(ecg):
+    network_list = []
+    consistent_rids = []
+    for rid,v in ecg["reactions"].items():
+        cids = v["left"] + v["right"]
+        try: ## This skips all reactions with n stoichiometries
+            stoichs = [-int(i) for i in v["metadata"]["left_stoichiometries"]]+[int(i) for i in v["metadata"]["right_stoichiometries"]]
+            network_list+=list(zip(cids,[rid for _ in range(len(stoichs))],stoichs))
+        except:
+            pass
+        if v["metadata"]["element_conservation"]==True:
+            consistent_rids.append(rid)
+    return pd.DataFrame(network_list,columns=("cid","rn","s")), pd.DataFrame(consistent_rids,columns=["rn"])
+
 class GlobalMetabolicNetwork:
     
-    def __init__(self):
+    def __init__(self,ecg_json=None):
         # load the data
-        network = pd.read_csv(asset_path + '/KEGG/network_full.csv')
-        cpds = pd.read_csv(asset_path +'/compounds/cpds.txt',sep='\t')
-        thermo = pd.read_csv(asset_path +'/reaction_free_energy/kegg_reactions_CC_ph7.0.csv',sep=',')
-        self.network = network
-        self.compounds = cpds
-        self.thermo = thermo
+        if ecg_json == None:
+            network = pd.read_csv(asset_path + '/KEGG/network_full.csv')
+            cpds = pd.read_csv(asset_path +'/compounds/cpds.txt',sep='\t')
+            thermo = pd.read_csv(asset_path +'/reaction_free_energy/kegg_reactions_CC_ph7.0.csv',sep=',')
+            self.network = network
+            self.thermo = thermo
+            self.compounds = cpds ## Includes many compounds without reactions
+            self.ecg = None
+        else:
+            with open(ecg_json) as f:
+                ecg = json.load(f)
+            network, consistent_rxns = load_ecg_network(ecg)
+            self.network = network
+            self.ecg = ecg
+            self.consistent_rxns = consistent_rxns
+            self.compounds = pd.DataFrame(self.network["cid"].unique(),columns=["cid"]) ## Only includes compounds with reactions
+
         self.temperature = 25
-        self.seedSet = None;
+        self.seedSet = None
+        self.rid_to_idx = None
+        self.idx_to_rid = None
+        self.cid_to_idx = None
+        self.idx_to_cid = None
+        self.S = None
         
     def copy(self):
         return deepcopy(self)
@@ -111,17 +142,57 @@ class GlobalMetabolicNetwork:
     def set_ph(self,pH):
         if ~(type(pH) == str):
             pH = str(pH)
-        try:
-            thermo = pd.read_csv(asset_path + '/reaction_free_energy/kegg_reactions_CC_ph' + pH + '.csv',sep=',')
-            self.thermo = thermo
-        except Exception as error:
-            print('Failed to open pH files (please use 5.0-9.0 in 0.5 increments)')    
-    
+        if self.ecg == None:
+            try:
+                thermo = pd.read_csv(asset_path + '/reaction_free_energy/kegg_reactions_CC_ph' + pH + '.csv',sep=',')
+                self.thermo = thermo
+            except Exception as error:
+                print('Failed to open pH files (please use 5.0-9.0 in 0.5 increments)')    
+        else:
+            try:
+                self.thermo = load_ecg_thermo(self.ecg,pH)
+            except:
+                raise ValueError("Try another pH, that one appears not to be in the ecg json")
+
+    def load_ecg_thermo(self,ph=9):
+        thermo_list = []
+        for rid,v in self.ecg["reactions"].items():
+            
+            phkey = str(ph)+"pH_100mM"
+            
+            if v["metadata"]["dg"][phkey]["standard_dg_prime_value"] == None:
+                dg = np.nan
+            else:
+                dg = v["metadata"]["dg"][phkey]["standard_dg_prime_value"]
+                
+            if v["metadata"]["dg"][phkey]["standard_dg_prime_error"] == None:
+                dgerror = np.nan
+            else:
+                dgerror = v["metadata"]["dg"][phkey]["standard_dg_prime_error"]
+                
+            if v["metadata"]["dg"][phkey]["is_uncertain"] == None:
+                note = "uncertainty is too high"
+            else:
+                note = np.nan
+
+            thermo_list.append((rid,
+                dg,
+                dgerror,
+                v["metadata"]["dg"][phkey]["p_h"],
+                v["metadata"]["dg"][phkey]["ionic_strength"]/1000,
+                v["metadata"]["dg"][phkey]["temperature"],
+                note)) 
+
+        return pd.DataFrame(thermo_list, columns = ("!MiriamID::urn:miriam:kegg.reaction","!dG0_prime (kJ/mol)","!sigma[dG0] (kJ/mol)","!pH","!I (mM)","!T (Kelvin)","!Note"))         
+
     
     def pruneInconsistentReactions(self):
         # remove reactions with qualitatively different sets of elements in reactions and products
-        consistent = pd.read_csv(asset_path + '/reaction_sets/reactions_consistent.csv')
-        self.network = self.network[self.network.rn.isin(consistent.rn.tolist())]
+        if self.ecg==None:
+            consistent = pd.read_csv(asset_path + '/reaction_sets/reactions_consistent.csv')
+            self.network = self.network[self.network.rn.isin(consistent.rn.tolist())]
+        else:
+            self.network = self.network[self.network.rn.isin(self.consistent_rxns.rn.tolist())]
         
     def pruneUnbalancedReactions(self):
         # only keep reactions that are elementally balanced
@@ -157,20 +228,17 @@ class GlobalMetabolicNetwork:
 
         self.network = pd.concat([self.network,new_rxns],axis=0)
         self.thermo = pd.concat([self.thermo,new_thermo],axis=0)
+
     
     def convertToIrreversible(self):
-        network = self.network
-        rn = network[['rn']]
-        cid = network[['cid']]
-        s = network[['s']]
-        rn_f = rn + ''
-        rn_b = rn + ''
-        rn_f['direction'] = 'forward'
-        rn_b['direction'] = 'reverse'
-        
-        nf = cid.join(rn_f).join(s)
-        nb = cid.join(rn_b).join(-s)
-        self.network = pd.concat([nf,nb],axis=0) 
+        nf = self.network.copy()
+        nb = self.network.copy()
+        nf['direction'] = 'forward'
+        nb['direction'] = 'reverse'
+        nb['s'] = -nb['s']
+        net = pd.concat([nf,nb],axis=0)
+        net = net.set_index(['cid','rn','direction']).reset_index()
+        self.network = net
     
     def setMetaboliteBounds(self,ub = 1e-1,lb = 1e-6): 
         
@@ -206,7 +274,8 @@ class GlobalMetabolicNetwork:
         if ~keepnan:
             res = res.dropna()
         
-        res = res[res['effDeltaG'] < 0].set_index(['rn','direction'])
+        #res = res[res['effDeltaG'] < 0].set_index(['rn','direction'])
+        res = res[~(res['effDeltaG'] > 0)].set_index(['rn','direction'])
         res = res.drop('effDeltaG',axis=1)
         self.network = res.join(self.network.set_index(['rn','direction'])).reset_index()
     
@@ -214,17 +283,51 @@ class GlobalMetabolicNetwork:
         if seedSet is None:
             print('No seed set')
         else:
-            network = self.network.pivot_table(index='cid',columns = ['rn','direction'],values='s').fillna(0)
-            x0 = np.array([x in seedSet for x in network.index.get_level_values(0)]) * 1;        
+            x0 = np.zeros([len(self.cid_to_idx)],dtype=int)
+            for x in set(seedSet)&set(self.cid_to_idx.keys()):
+                x0[self.cid_to_idx[x]] = 1     
             return x0
+
+    def create_reaction_dicts(self):
+        rids = set(zip(self.network["rn"],self.network["direction"]))
+        rid_to_idx = dict()
+        idx_to_rid = dict()
+        for v, k in enumerate(rids):
+            rid_to_idx[k] = v
+            idx_to_rid[v] = k
+        
+        return rid_to_idx, idx_to_rid
+
+    def create_compound_dicts(self):
+        cids = set(self.network["cid"])
+        cid_to_idx = dict()
+        idx_to_cid = dict()
+        for v, k in enumerate(cids):
+            cid_to_idx[k] = v
+            idx_to_cid[v] = k
+        
+        return cid_to_idx, idx_to_cid
+
+    def create_S_from_irreversible_network(self):
+        
+        S = np.zeros([len(self.cid_to_idx),len(self.rid_to_idx)])
+            
+        for c,r,d,s in zip(self.network["cid"],self.network["rn"],self.network["direction"],self.network["s"]):
+            S[self.cid_to_idx[c],self.rid_to_idx[(r,d)]] = s
+
+        return S
         
     def expand(self,seedSet,algorithm='naive'):
         # constructre network from skinny table and create matricies for NE algorithm
+        # if (self.rid_to_idx is None) or (self.idx_to_rid is None):
+        self.rid_to_idx, self.idx_to_rid = self.create_reaction_dicts()
+        # if (self.cid_to_idx is None) or (self.idx_to_cid is None):
+        self.cid_to_idx, self.idx_to_cid = self.create_compound_dicts()
+        # if self.S is None:
+        self.S = self.create_S_from_irreversible_network()
         x0 = self.initialize_metabolite_vector(seedSet)
-        network = self.network.pivot_table(index='cid',columns = ['rn','direction'],values='s').fillna(0)
-        S = network.values
-        R = (S < 0)*1
-        P = (S > 0)*1
+        R = (self.S < 0)*1
+        P = (self.S > 0)*1
         b = sum(R)
 
         # sparsefy data
@@ -244,15 +347,14 @@ class GlobalMetabolicNetwork:
         
         # convert to list of metabolite ids and reaction ids
         if x.toarray().sum() > 0:
-            cidx = np.where(x.toarray().T[0])[0]
-            compounds = network.iloc[cidx].index.get_level_values(0).tolist()
+            cidx = np.nonzero(x.toarray().T[0])[0]
+            compounds = [self.idx_to_cid[i] for i in cidx]
         else:
             compounds = []
             
         if y.toarray().sum() > 0:
-            ridx = np.where(y.toarray().T[0])[0]
-            ridx = np.where(y.toarray().T[0])[0]
-            reactions = list(network.iloc[:,ridx])
+            ridx = np.nonzero(y.toarray().T[0])[0]
+            reactions = [self.idx_to_rid[i] for i in ridx]
         else:
             reactions = [];
             

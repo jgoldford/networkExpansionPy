@@ -53,7 +53,11 @@ seed_set = cpds['CID'].unique().tolist()
 print('building fold-to-reaction mapping...')
 # define fold rules
 fold_rules = FoldRules()
+<<<<<<< HEAD
 fold_rules.setRules(path='/ecode/ecod2rn.ec4.12Feb2021.csv')
+=======
+fold_rules.setRules(path='ecode/ecod2rn.ec4.12Feb2021.csv')
+>>>>>>> 164000e965fc3414829ce130621d7dd6a72d87f3
 
 
 # determine scope of folds (reaction sets that involve the fold)
@@ -178,4 +182,8 @@ fold_df.to_csv(foldOrderTable)
 
 #cpd_df.to_csv('res.cpd.csv')
 #rxn_df.to_csv('res.rxn.csv')
+<<<<<<< HEAD
 #fold_df.to_csv('res.foldOrder.csv')
+=======
+#fold_df.to_csv('res.foldOrder.csv')
+>>>>>>> 164000e965fc3414829ce130621d7dd6a72d87f3
