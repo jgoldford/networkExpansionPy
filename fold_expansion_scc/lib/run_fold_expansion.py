@@ -9,6 +9,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-s", "--simulation_id", type=str,
                     help="unique id for each random simulation; will be saved to a table on the scc")
 
+args = parser.parse_args()
 # parse the arguments
 
 #outFilePath = args.output
