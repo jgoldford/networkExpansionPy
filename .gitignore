@@ -84,3 +84,6 @@ ipython_config.py
 
 # Mac
 .DS_Store
+
+# VSCode
+.vscode
