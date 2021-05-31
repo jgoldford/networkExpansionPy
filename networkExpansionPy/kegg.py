@@ -4,11 +4,6 @@
 import os
 import re
 import json
-import copy
-import glob
-import itertools
-import warnings
-import argparse
 from Bio.KEGG import REST #, Enzyme, Compound, Map
 import Bio.TogoWS as TogoWS
 from tqdm import tqdm
