@@ -25,8 +25,14 @@ def download_kegg(path=None):
 
     print("KEGG data will be downloaded to %s"%path)
 
+    print("Downloading lists...")
     _download_lists(path)
+    print("Downloading entries...")
     _download_entries(path)
+    print("Detailing compounds...")
+    _detail_compounds(path)
+    print("Detailing reactions...")
+    _detail_reactions(path)
 
 def _download_lists(path,dbs=["reaction","compound"]):
     """
@@ -124,6 +130,165 @@ def _detail_compounds(path):
     with open(os.path.join(entries_path_detailed,'compound.json'), 'w') as f:
         json.dump(compounds, f, indent=2)
 
+
+def _detail_reactions(path):
+        """
+        Add reaction details in convenient fields for rn jsons.
+        """
+
+        reaction_path = os.path.join(path,'entries','reaction.json')
+        compound_path = os.path.join(path,'entries','compound.json')
+
+        with open(compound_path) as f:    
+            compound_dict = json.load(f)#[0]
+
+        with open(reaction_path) as f:
+            reaction_dict = json.load(f)
+        # for path in glob.glob(compound_path+"*.json"):
+        #     with open(path) as f:
+        #         compound_json = json.load(f) #[0]
+        #         compound_dict[compound_json["entry_id"]] = compound_json
+        
+        for k,v in reaction_dict.items():
+                
+            equation = v["equation"]
+
+            if re.search(r'(G\d+)',equation) == None: ## Only find entries without glycans
+
+                for i, side in enumerate(equation.split(" <=> ")):
+
+                    compounds = []
+                    stoichiometries = []
+
+                    ## match (n+1) C00001, (m-1) C00001 or similar
+                    matches = re.findall(r'(\(\S*\) C\d+)',side)
+                    # print matches
+                    if len(matches) != 0:
+                        for match in matches:
+                            compound = re.search(r'(C\d+)',match).group(1)
+                            stoichiometry = re.search(r'(\(\S*\))',match).group(1)
+                            
+                            compounds.append(compound)
+                            stoichiometries.append(stoichiometry)
+
+                    ## match 23n C00001, m C00001 or similar
+                    matches = re.findall(r'(\d*[n,m] C\d+)',side)
+                    if len(matches) != 0:
+                        for match in matches:
+                            compound = re.search(r'(C\d+)',match).group(1)
+                            stoichiometry = re.search(r'(\d*[n,m])',match).group(1)
+                            
+                            compounds.append(compound)
+                            stoichiometries.append(stoichiometry)
+
+                    ## match C06215(m+n), C06215(23m) or similar
+                    matches = re.findall(r'(C\d+\(\S*\))',side)
+                    if len(matches) != 0:
+                        for match in matches:
+                            compound = re.search(r'(C\d+)',match).group(1)
+                            stoichiometry = re.search(r'(\(\S*\))',match).group(1)
+                            
+                            compounds.append(compound)
+                            stoichiometries.append(stoichiometry)
+
+                    ## match "3 C00002" or similar (but NOT C00002 without a number)
+                    matches = re.findall(r'(\d+ C\d+)',side)
+                    if len(matches) != 0:
+                        for match in matches:
+                            compound = re.search(r'(C\d+)',match).group(1)
+                            stoichiometry = match.split(' '+compound)[0]# re.search(r'(\(\S*\))',match).group(1)
+                            
+                            compounds.append(compound)
+                            stoichiometries.append(stoichiometry)
+
+                    ## match "C00001 "at the start of the line (no coefficients)
+                    matches = re.findall(r'(^C\d+) ',side)
+                    if len(matches) != 0:
+                        for match in matches:
+                            compound = re.search(r'(C\d+)',match).group(1)
+                            stoichiometry = '1'
+                            
+                            compounds.append(compound)
+                            stoichiometries.append(stoichiometry)
+
+                    ## match "+ C00001 " (no coefficients)
+                    matches = re.findall(r'(\+ C\d+ )',side)
+                    if len(matches) != 0:
+                        for match in matches:
+                            compound = re.search(r'(C\d+)',match).group(1)
+                            stoichiometry = "1"
+                            
+                            compounds.append(compound)
+                            stoichiometries.append(stoichiometry)
+
+                    ## match "+ C00001" at the end of the line (no coefficients)
+                    matches = re.findall(r'(\+ C\d+$)',side)
+                    if len(matches) != 0:
+                        for match in matches:
+                            compound = re.search(r'(C\d+)',match).group(1)
+                            stoichiometry = "1"
+                            
+                            compounds.append(compound)
+                            stoichiometries.append(stoichiometry)
+
+                    ## match "C00001" which is at the start and end of the line
+                    matches = re.findall(r'(^C\d+$)',side)
+                    if len(matches) != 0:
+                        for match in matches:
+                            compound = re.search(r'(C\d+)',match).group(1)
+                            stoichiometry = "1"
+                            
+                            compounds.append(compound)
+                            stoichiometries.append(stoichiometry)
+
+                    if i==0:
+                        v["left"] = compounds
+                        v["left_stoichiometries"] = stoichiometries
+                        v["left_elements"] = set()
+                        ## Add element data
+                        for c in compounds:
+                            if c in compound_dict:
+                                v["left_elements"] = v["left_elements"].union(compound_dict[c]['elements'])
+                            else:
+                                v["left_elements"] = v["left_elements"].union('missing_cid')
+                                v["contains_missingcid"] = True
+                    elif i==1:
+                        v["right"] = compounds
+                        v["right_stoichiometries"] = stoichiometries
+                        v["right_elements"] = set()
+                        ## Add element data
+                        for c in compounds:
+                            if c in compound_dict:
+                                v["right_elements"] = v["right_elements"].union(compound_dict[c]['elements'])
+                            else:
+                                v["right_elements"] = v["right_elements"].union('missing_cid')
+                                v["contains_missingcid"] = True
+                    
+                if "contains_missingcid" not in v:
+                    v["contains_missingcid"] = False
+
+                if v["left_elements"] != v["right_elements"]:
+                    v["element_conservation"] = False
+                    v["elements_mismatched"] = list(v["left_elements"]^v["right_elements"])
+                else:
+                    v["element_conservation"] = True
+                    v["elements_mismatched"] = list()
+                
+                assert len(compounds) == len(stoichiometries)
+                v["glycans"] = False
+
+            else:
+
+                v["glycans"] = True
+
+        ## Create detailed entry path if it doesn't exist
+        entries_path_detailed = os.path.join(path,"entries_detailed")
+        if not os.path.exists(entries_path_detailed):
+            os.makedirs(entries_path_detailed)
+
+        ## Rewrite file with added detail
+        with open(os.path.join(entries_path_detailed,'reaction.json'), 'w') as f:
+            json.dump(reaction_dict, f, indent=2, default=serialize_sets)
 
 def serialize_sets(obj):
     if isinstance(obj, set):
