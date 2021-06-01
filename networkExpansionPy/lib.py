@@ -111,14 +111,15 @@ def load_json_network(rdict):
     network_list = []
     consistent_rids = []
     for rid,v in rdict.items():
-        cids = v["left"] + v["right"]
-        try: ## This skips all reactions with n stoichiometries
-            stoichs = [-int(i) for i in v["left_stoichiometries"]]+[int(i) for i in v["right_stoichiometries"]]
-            network_list+=list(zip(cids,[rid for _ in range(len(stoichs))],stoichs))
-        except:
-            pass
-        if v["element_conservation"]==True:
-            consistent_rids.append(rid)
+        if v["glycans"] == False: ## This skips all reactions with glycans
+            cids = v["left"] + v["right"]
+            try: ## This skips all reactions with n stoichiometries
+                stoichs = [-int(i) for i in v["left_stoichiometries"]]+[int(i) for i in v["right_stoichiometries"]]
+                network_list+=list(zip(cids,[rid for _ in range(len(stoichs))],stoichs))
+            except:
+                pass
+            if v["element_conservation"]==True:
+                consistent_rids.append(rid)
     return pd.DataFrame(network_list,columns=("cid","rn","s")), pd.DataFrame(consistent_rids,columns=["rn"])
 
 class GlobalMetabolicNetwork:
