@@ -228,8 +228,11 @@ class GlobalMetabolicNetwork:
 
     def pruneUnbalancedReactions(self):
         # only keep reactions that are elementally balanced
-        balanced = pd.read_csv(asset_path + '/reaction_sets/reactions_balanced.csv')
-        self.network = self.network[self.network.rn.isin(balanced.rn.tolist())]
+        if self.metabolism=="KEGG_OG":
+            balanced = pd.read_csv(asset_path + '/reaction_sets/reactions_balanced.csv')
+            self.network = self.network[self.network.rn.isin(balanced.rn.tolist())]
+        else:
+            raise(NotImplementedError("Function not yet implemented for metabolism = %s"%self.metabolism)) 
         
     def subnetwork(self,rxns):
         # only keep reactions that are in list
@@ -279,6 +282,9 @@ class GlobalMetabolicNetwork:
       
     def pruneThermodynamicallyInfeasibleReactions(self,keepnan = False):
         fixed_mets = ['C00001','C00080']
+
+        if not hasattr(self, 'thermo'):
+            raise(AttributeError("Metabolism has no thermo data."))
 
         RT = 0.008309424 * (273.15+self.temperature)
         rns  = []
