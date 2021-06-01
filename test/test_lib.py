@@ -5,6 +5,7 @@ class TestGlobalMetabolicNetworkInit(unittest.TestCase):
 
     def test_kegg_og_no_args(self):
         kegg_og = ne.GlobalMetabolicNetwork()
+        kegg_og.pruneUnbalancedReactions()
 
     def test_kegg_og(self):
         kegg_og = ne.GlobalMetabolicNetwork("KEGG_OG")

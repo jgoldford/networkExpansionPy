@@ -181,7 +181,8 @@ class GlobalMetabolicNetwork:
             except:
                 raise ValueError("Try another pH, that one appears not to be in the ecg json")
         else:
-            print("pH not yet implemented for metabolism = %s"%self.metabolism)
+            raise(NotImplementedError("pH not yet implemented for metabolism = %s"%self.metabolism)) 
+
 
     def load_ecg_thermo(self,ph=9):
         thermo_list = []
@@ -223,7 +224,7 @@ class GlobalMetabolicNetwork:
         elif self.metabolism=="KEGG" or self.metabolism=="ecg":
             self.network = self.network[self.network.rn.isin(self.consistent_rxns.rn.tolist())]
         else:
-            print("Function not yet implemented for metabolism = %s"%self.metabolism)
+            raise(NotImplementedError("Function not yet implemented for metabolism = %s"%self.metabolism)) 
 
     def pruneUnbalancedReactions(self):
         # only keep reactions that are elementally balanced
