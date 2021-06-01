@@ -8,6 +8,7 @@ from Bio.KEGG import REST #, Enzyme, Compound, Map
 import Bio.TogoWS as TogoWS
 from tqdm import tqdm
 from datetime import datetime
+import shutil
 
 def download_kegg(path=None):
 
@@ -40,7 +41,7 @@ def _download_lists(path,dbs=["reaction","compound"]):
     if not os.path.exists(lists_path):
         os.makedirs(lists_path)
 
-    lists = __retrieve_lists(dbs)
+    lists = _retrieve_lists(dbs)
 
     ## Write json of all entry ids and names
     for db in dbs:
@@ -48,7 +49,7 @@ def _download_lists(path,dbs=["reaction","compound"]):
         with open(list_path, 'w') as f:   
             json.dump(lists[db], f, indent=2)
 
-def __retrieve_lists(dbs):
+def _retrieve_lists(dbs):
         
         lists = dict()
         for db in dbs:
@@ -77,6 +78,8 @@ def _download_entries(path,dbs=["reaction","compound"]):
         ## Get entries on all kegg types
         for db in dbs:
 
+            print("Downloading %s entries..."%db)
+
             ## Read list of all kegg ids
             list_path = os.path.join(path,"lists",db+".json")
             with open(list_path) as f:    
@@ -87,12 +90,12 @@ def _download_entries(path,dbs=["reaction","compound"]):
             for entry in tqdm(list_data):
                 
                 entry_id = entry.split(":")[1]
-                entry_fname = entry_id+".json"
+                # entry_fname = entry_id+".json"
                 # entry_path = os.path.join(entries_path, entry_fname)
 
-                while entry_fname not in os.listdir(entries_path):
+                while entry_id not in entries:
                     try:
-                        handle = TogoWS.entry(db, entry_id, format="json")
+                        handle = TogoWS.entry(db, entry_id, format="json") ## Will always return something, even if entry doesn't exist
                         entries[entry_id] = json.loads(handle.read())[0]
                         # with open(entry_path, 'a') as f:
                         #     f.write(handle.read())
@@ -132,9 +135,9 @@ def _detail_reactions(path):
         """
 
         reaction_path = os.path.join(path,'entries','reaction.json')
-        compound_path = os.path.join(path,'entries','compound.json')
+        compound_path_detailed = os.path.join(path,'entries_detailed','compound.json')
 
-        with open(compound_path) as f:    
+        with open(compound_path_detailed) as f:    
             compound_dict = json.load(f)#[0]
 
         with open(reaction_path) as f:
@@ -283,10 +286,37 @@ def _detail_reactions(path):
 
         ## Rewrite file with added detail
         with open(os.path.join(entries_path_detailed,'reaction.json'), 'w') as f:
-            json.dump(reaction_dict, f, indent=2, default=serialize_sets)
+            json.dump(reaction_dict, f, indent=2, default=_serialize_sets)
 
-def serialize_sets(obj):
+def _serialize_sets(obj):
     if isinstance(obj, set):
         return list(obj)
 
     return obj
+
+def create_shutl_zips(path):
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if file.endswith(".json"):
+                shutil.make_archive(os.path.join(root, file), 'zip', root, file)
+
+
+
+if __name__ == "__main__":
+    # download_kegg("/Users/harrison/ELSI/bioxp/networkExpansionPy/KEGG/2021.05.31-18.06.52")
+    # with open("/Users/harrison/ELSI/bioxp/networkExpansionPy/KEGG/2021.05.31-18.06.52/entries_detailed/compound.json.zip") as f:
+    #     myjson = json.load(f.decode("utf-8"))
+
+    create_shutl_zips("/Users/harrison/ELSI/bioxp/networkExpansionPy/KEGG/2021.05.31-18.06.52/")
+
+    ## Write zipped files
+    # create_zips("/Users/harrison/ELSI/bioxp/networkExpansionPy/KEGG/2021.05.31-18.06.52/")
+
+    ## Read zipped json
+    # with zipfile.ZipFile("/Users/harrison/ELSI/bioxp/networkExpansionPy/KEGG/2021.05.31-18.06.52/entries_detailed/compound.json.zip","r") as z:
+    #     myjson = json.loads(z.read(z.infolist()[0]).decode())
+
+    # print(len(myjson))
+    # print(myjson["C00001"])    
+    # with open("/Users/harrison/ELSI/bioxp/networkExpansionPy/KEGG/2021.05.31-18.06.52/entries_detailed/compound.pkl", 'wb') as f:
+    #     pickle.dump(myjson, f, pickle.HIGHEST_PROTOCOL)
