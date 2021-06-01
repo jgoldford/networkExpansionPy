@@ -143,7 +143,7 @@ class GlobalMetabolicNetwork:
             self.compounds = pd.DataFrame(self.network["cid"].unique(),columns=["cid"]) ## Only includes compounds with reactions
 
         elif metabolism == "KEGG":
-            with zipfile.ZipFile(os.path.join(asset_path,"KEGG","2021.05.31-18.06.52","entries_detailed","reaction.json.zip","r")) as z:
+            with zipfile.ZipFile(os.path.join(asset_path,"KEGG","2021.05.31-18.06.52","entries_detailed","reaction.json.zip"),"r") as z:
                 rdict = json.loads(z.read(z.infolist()[0]).decode())
             network, consistent_rxns = load_json_network(rdict)
             self.network = network
