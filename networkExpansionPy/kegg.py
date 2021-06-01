@@ -299,24 +299,3 @@ def create_shutl_zips(path):
         for file in files:
             if file.endswith(".json"):
                 shutil.make_archive(os.path.join(root, file), 'zip', root, file)
-
-
-
-if __name__ == "__main__":
-    # download_kegg("/Users/harrison/ELSI/bioxp/networkExpansionPy/KEGG/2021.05.31-18.06.52")
-    # with open("/Users/harrison/ELSI/bioxp/networkExpansionPy/KEGG/2021.05.31-18.06.52/entries_detailed/compound.json.zip") as f:
-    #     myjson = json.load(f.decode("utf-8"))
-
-    create_shutl_zips("/Users/harrison/ELSI/bioxp/networkExpansionPy/KEGG/2021.05.31-18.06.52/")
-
-    ## Write zipped files
-    # create_zips("/Users/harrison/ELSI/bioxp/networkExpansionPy/KEGG/2021.05.31-18.06.52/")
-
-    ## Read zipped json
-    # with zipfile.ZipFile("/Users/harrison/ELSI/bioxp/networkExpansionPy/KEGG/2021.05.31-18.06.52/entries_detailed/compound.json.zip","r") as z:
-    #     myjson = json.loads(z.read(z.infolist()[0]).decode())
-
-    # print(len(myjson))
-    # print(myjson["C00001"])    
-    # with open("/Users/harrison/ELSI/bioxp/networkExpansionPy/KEGG/2021.05.31-18.06.52/entries_detailed/compound.pkl", 'wb') as f:
-    #     pickle.dump(myjson, f, pickle.HIGHEST_PROTOCOL)

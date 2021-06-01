@@ -6,6 +6,7 @@ from random import sample
 import os
 import json
 from copy import copy, deepcopy
+import zipfile
 
 # define asset path
 asset_path,filename = os.path.split(os.path.abspath(__file__))
@@ -107,27 +108,53 @@ def load_ecg_network(ecg):
             consistent_rids.append(rid)
     return pd.DataFrame(network_list,columns=("cid","rn","s")), pd.DataFrame(consistent_rids,columns=["rn"])
 
+def load_json_network(rdict):
+    network_list = []
+    consistent_rids = []
+    for rid,v in rdict.items():
+        cids = v["left"] + v["right"]
+        try: ## This skips all reactions with n stoichiometries
+            stoichs = [-int(i) for i in v["left_stoichiometries"]]+[int(i) for i in v["right_stoichiometries"]]
+            network_list+=list(zip(cids,[rid for _ in range(len(stoichs))],stoichs))
+        except:
+            pass
+        if v["element_conservation"]==True:
+            consistent_rids.append(rid)
+    return pd.DataFrame(network_list,columns=("cid","rn","s")), pd.DataFrame(consistent_rids,columns=["rn"])
+
 class GlobalMetabolicNetwork:
     
-    def __init__(self,ecg_json=None):
-        # load the data
-        if ecg_json == None:
+    def __init__(self,metabolism="KEGG_OG"):
+        # load the data        
+        if metabolism == "KEGG_OG":
             network = pd.read_csv(asset_path + '/KEGG/network_full.csv')
             cpds = pd.read_csv(asset_path +'/compounds/cpds.txt',sep='\t')
             thermo = pd.read_csv(asset_path +'/reaction_free_energy/kegg_reactions_CC_ph7.0.csv',sep=',')
             self.network = network
             self.thermo = thermo
             self.compounds = cpds ## Includes many compounds without reactions
-            self.ecg = None
-        else:
-            with open(ecg_json) as f:
+            
+        
+        elif metabolism == "ecg":
+            with open(os.path.join(asset_path,"ecg","master_from_kegg_2021-01-05.json")) as f:
                 ecg = json.load(f)
             network, consistent_rxns = load_ecg_network(ecg)
             self.network = network
-            self.ecg = ecg
             self.consistent_rxns = consistent_rxns
             self.compounds = pd.DataFrame(self.network["cid"].unique(),columns=["cid"]) ## Only includes compounds with reactions
 
+        elif metabolism == "KEGG":
+            with zipfile.ZipFile(os.path.join(asset_path,"KEGG","2021.05.31-18.06.52","entries_detailed","reaction.json.zip","r")) as z:
+                rdict = json.loads(z.read(z.infolist()[0]).decode())
+            network, consistent_rxns = load_json_network(rdict)
+            self.network = network
+            self.consistent_rxns = consistent_rxns
+            self.compounds = pd.DataFrame(self.network["cid"].unique(),columns=["cid"]) ## Only includes compounds with reactions
+
+        else:
+            raise(ValueError("'metabolism' must be one of 'KEGG_OG, 'ecg', 'KEGG'"))
+
+        self.metabolism = metabolism
         self.temperature = 25
         self.seedSet = None
         self.rid_to_idx = None
@@ -142,21 +169,23 @@ class GlobalMetabolicNetwork:
     def set_ph(self,pH):
         if ~(type(pH) == str):
             pH = str(pH)
-        if self.ecg == None:
+        if self.metabolism == "KEGG_OG":
             try:
                 thermo = pd.read_csv(asset_path + '/reaction_free_energy/kegg_reactions_CC_ph' + pH + '.csv',sep=',')
                 self.thermo = thermo
             except Exception as error:
                 print('Failed to open pH files (please use 5.0-9.0 in 0.5 increments)')    
-        else:
+        elif self.metabolism == "ecg":
             try:
-                self.thermo = load_ecg_thermo(self.ecg,pH)
+                self.thermo = self.load_ecg_thermo(self.metabolism,pH)
             except:
                 raise ValueError("Try another pH, that one appears not to be in the ecg json")
+        else:
+            print("pH not yet implemented for metabolism = %s"%self.metabolism)
 
     def load_ecg_thermo(self,ph=9):
         thermo_list = []
-        for rid,v in self.ecg["reactions"].items():
+        for rid,v in self.metabolism["reactions"].items():
             
             phkey = str(ph)+"pH_100mM"
             
@@ -188,12 +217,14 @@ class GlobalMetabolicNetwork:
     
     def pruneInconsistentReactions(self):
         # remove reactions with qualitatively different sets of elements in reactions and products
-        if self.ecg==None:
+        if self.metabolism=="KEGG_OG":
             consistent = pd.read_csv(asset_path + '/reaction_sets/reactions_consistent.csv')
             self.network = self.network[self.network.rn.isin(consistent.rn.tolist())]
-        else:
+        elif self.metabolism=="KEGG" or self.metabolism=="ecg":
             self.network = self.network[self.network.rn.isin(self.consistent_rxns.rn.tolist())]
-        
+        else:
+            print("Function not yet implemented for metabolism = %s"%self.metabolism)
+
     def pruneUnbalancedReactions(self):
         # only keep reactions that are elementally balanced
         balanced = pd.read_csv(asset_path + '/reaction_sets/reactions_balanced.csv')
