@@ -354,6 +354,20 @@ class GlobalMetabolicNetwork:
             S[self.cid_to_idx[c],self.rid_to_idx[(r,d)]] = s
 
         return S
+
+    def create_iteration_dict(self,M,idx_to_id):
+        idx_iter = dict()
+        for i,row in enumerate(M):
+            idxs = np.nonzero(row.toarray().T[0])[0]
+            for idx in idxs:
+                if idx not in idx_iter:
+                    idx_iter[idx] = i
+
+        id_iter = dict()
+        for idx,i in idx_iter.items():
+            id_iter[idx_to_id[idx]] = i  
+
+        return id_iter
         
     def expand(self,seedSet,algorithm='naive'):
         # constructre network from skinny table and create matricies for NE algorithm
@@ -386,35 +400,44 @@ class GlobalMetabolicNetwork:
             raise ValueError('algorithm needs to be naive (compound stopping criteria) or cr (reaction/compound stopping criteria)')
         
         if algorithm.lower() == 'trace':
-            idx_iter = dict()
-            for i,x in enumerate(X):
-                idxs = np.nonzero(x.toarray().T[0])[0]
-                for idx in idxs:
-                    if idx not in idx_iter:
-                        idx_iter[idx] = i
+            # idx_iter = dict()
+            # for i,x in enumerate(X):
+            #     idxs = np.nonzero(x.toarray().T[0])[0]
+            #     for idx in idxs:
+            #         if idx not in idx_iter:
+            #             idx_iter[idx] = i
 
-            # compounds = []
-            # cpditeration = []
+            # cid_iter = dict()
             # for idx,i in idx_iter.items():
-            #     compounds.append(self.idx_to_cid[idx])
-            #     cpditeration.append(i)  
-            cid_iter = dict()
-            for idx,i in idx_iter.items():
-                cid_iter[self.idx_to_cid[idx]] = i  
+            #     cid_iter[self.idx_to_cid[idx]] = i  
 
-        return X
+            self.create_iteration_dict(self,X,self.idx_to_cid)
 
-        # convert to list of metabolite ids and reaction ids
-        if x.toarray().sum() > 0:
-            cidx = np.nonzero(x.toarray().T[0])[0]
-            compounds = [self.idx_to_cid[i] for i in cidx]
+            # idx_iter = dict()
+            # for i,x in enumerate(X):
+            #     idxs = np.nonzero(x.toarray().T[0])[0]
+            #     for idx in idxs:
+            #         if idx not in idx_iter:
+            #             idx_iter[idx] = i
+
+            # cid_iter = dict()
+            # for idx,i in idx_iter.items():
+            #     cid_iter[self.idx_to_cid[idx]] = i  
+
+           self.create_iteration_dict(self,Y,self.idx_to_rid)
+
         else:
-            compounds = []
-            
-        if y.toarray().sum() > 0:
-            ridx = np.nonzero(y.toarray().T[0])[0]
-            reactions = [self.idx_to_rid[i] for i in ridx]
-        else:
-            reactions = [];
-            
-        return compounds,reactions
+            # convert to list of metabolite ids and reaction ids
+            if x.toarray().sum() > 0:
+                cidx = np.nonzero(x.toarray().T[0])[0]
+                compounds = [self.idx_to_cid[i] for i in cidx]
+            else:
+                compounds = []
+                
+            if y.toarray().sum() > 0:
+                ridx = np.nonzero(y.toarray().T[0])[0]
+                reactions = [self.idx_to_rid[i] for i in ridx]
+            else:
+                reactions = [];
+                
+            return compounds,reactions
