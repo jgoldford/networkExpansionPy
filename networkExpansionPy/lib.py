@@ -400,31 +400,10 @@ class GlobalMetabolicNetwork:
             raise ValueError('algorithm needs to be naive (compound stopping criteria) or cr (reaction/compound stopping criteria)')
         
         if algorithm.lower() == 'trace':
-            # idx_iter = dict()
-            # for i,x in enumerate(X):
-            #     idxs = np.nonzero(x.toarray().T[0])[0]
-            #     for idx in idxs:
-            #         if idx not in idx_iter:
-            #             idx_iter[idx] = i
-
-            # cid_iter = dict()
-            # for idx,i in idx_iter.items():
-            #     cid_iter[self.idx_to_cid[idx]] = i  
-
-            self.create_iteration_dict(self,X,self.idx_to_cid)
-
-            # idx_iter = dict()
-            # for i,x in enumerate(X):
-            #     idxs = np.nonzero(x.toarray().T[0])[0]
-            #     for idx in idxs:
-            #         if idx not in idx_iter:
-            #             idx_iter[idx] = i
-
-            # cid_iter = dict()
-            # for idx,i in idx_iter.items():
-            #     cid_iter[self.idx_to_cid[idx]] = i  
-
-           self.create_iteration_dict(self,Y,self.idx_to_rid)
+    
+            compound_iteration_dict = self.create_iteration_dict(self,X,self.idx_to_cid)
+            reaction_iteration_dict = self.create_iteration_dict(self,Y,self.idx_to_rid)
+            return compound_iteration_dict, reaction_iteration_dict
 
         else:
             # convert to list of metabolite ids and reaction ids
