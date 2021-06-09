@@ -401,8 +401,8 @@ class GlobalMetabolicNetwork:
         
         if algorithm.lower() == 'trace':
     
-            compound_iteration_dict = self.create_iteration_dict(self,X,self.idx_to_cid)
-            reaction_iteration_dict = self.create_iteration_dict(self,Y,self.idx_to_rid)
+            compound_iteration_dict = self.create_iteration_dict(X,self.idx_to_cid)
+            reaction_iteration_dict = self.create_iteration_dict(Y,self.idx_to_rid)
             return compound_iteration_dict, reaction_iteration_dict
 
         else:
