@@ -380,9 +380,30 @@ class GlobalMetabolicNetwork:
             x,y = netExp(R,P,x0,b)
         elif algorithm.lower() == 'cr':
             x,y = netExp_cr(R,P,x0,b)
+        elif algorithm.lower() == 'trace':
+            X,Y = netExp_trace(R,P,x0,b)
         else:
             raise ValueError('algorithm needs to be naive (compound stopping criteria) or cr (reaction/compound stopping criteria)')
         
+        if algorithm.lower() == 'trace':
+            idx_iter = dict()
+            for i,x in enumerate(X):
+                idxs = np.nonzero(x.toarray().T[0])[0]
+                for idx in idxs:
+                    if idx not in idx_iter:
+                        idx_iter[idx] = i
+
+            # compounds = []
+            # cpditeration = []
+            # for idx,i in idx_iter.items():
+            #     compounds.append(self.idx_to_cid[idx])
+            #     cpditeration.append(i)  
+            cid_iter = dict()
+            for idx,i in idx_iter.items():
+                cid_iter[self.idx_to_cid[idx]] = i  
+
+        return X
+
         # convert to list of metabolite ids and reaction ids
         if x.toarray().sum() > 0:
             cidx = np.nonzero(x.toarray().T[0])[0]
@@ -397,4 +418,3 @@ class GlobalMetabolicNetwork:
             reactions = [];
             
         return compounds,reactions
-
