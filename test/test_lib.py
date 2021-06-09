@@ -127,11 +127,15 @@ class Test_create_iteration_dict(unittest.TestCase):
         self.X,self.Y = ne.netExp_trace(R,P,x0,b)
     
     def test_iteration_dict(self):
-        compound_iteration_dict = self.kegg.create_iteration_dict(self.X,self.kegg.idx_to_cid)
+        compound_iteration_dict = self.kegg.create_iteration_dict(self.X, self.kegg.idx_to_cid)
+        reaction_iteration_dict = self.kegg.create_iteration_dict(self.Y, self.kegg.idx_to_rid)
 
         ## Look through iteration 0 compounds and make sure its exactly equal to seed set
-        self.
+        self.assertEqual(set([k for k,v in compound_iteration_dict.items() if v==0]), set(self.seedSet))
 
         ## Check that matrix has exactlly two more rows than max(idx_iter.values())
-
+        self.assertEqual(len(self.X)-2, max(compound_iteration_dict.values()) )
+        self.assertEqual(len(self.Y)-2, max(reaction_iteration_dict.values()) )
         ## Check that all iterations are present in at least 1 compound in the iteration dict
+        self.assertEqual(len(self.X)-2, len(set(compound_iteration_dict.values())) )
+        self.assertEqual(len(self.Y)-2, len(set(reaction_iteration_dict.values())) )
