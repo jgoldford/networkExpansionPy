@@ -1,6 +1,7 @@
 import unittest
 import networkExpansionPy.lib as ne
 import pandas as pd
+from scipy.sparse import csr_matrix
 
 class TestGlobalMetabolicNetworkInit(unittest.TestCase):
 
@@ -89,3 +90,53 @@ class TestGlobalMetabolicNetworkInit(unittest.TestCase):
 
         with self.assertRaises(AttributeError):
             kegg.pruneThermodynamicallyInfeasibleReactions()
+
+class Test_create_iteration_dict(unittest.TestCase):
+
+    # @classmethod
+    # def setup_class(self):
+    def setUp(self):
+        self.kegg = ne.GlobalMetabolicNetwork("KEGG")
+        self.kegg.pruneInconsistentReactions()
+        self.kegg.convertToIrreversible()
+        self.seedSet = ["C00001",
+                "C00011",
+                "C00014",
+                "C00033",
+                "C00058",
+                "C00283",
+                "C00288",
+                "C00697"]
+
+        self.kegg.rid_to_idx, self.kegg.idx_to_rid = self.kegg.create_reaction_dicts()
+        self.kegg.cid_to_idx, self.kegg.idx_to_cid = self.kegg.create_compound_dicts()
+        self.kegg.S = self.kegg.create_S_from_irreversible_network()
+        x0 = self.kegg.initialize_metabolite_vector(self.seedSet)
+        R = (self.kegg.S < 0)*1
+        P = (self.kegg.S > 0)*1
+        b = sum(R)
+
+        # sparsefy data
+        R = csr_matrix(R)
+        P = csr_matrix(P)
+        b = csr_matrix(b)
+        b = b.transpose()
+
+        x0 = csr_matrix(x0)
+        x0 = x0.transpose()
+
+        self.X,self.Y = ne.netExp_trace(R,P,x0,b)
+    
+    def test_iteration_dict(self):
+        compound_iteration_dict = self.kegg.create_iteration_dict(self.X, self.kegg.idx_to_cid)
+        reaction_iteration_dict = self.kegg.create_iteration_dict(self.Y, self.kegg.idx_to_rid)
+
+        ## Look through iteration 0 compounds and make sure its exactly equal to seed set
+        self.assertEqual(set([k for k,v in compound_iteration_dict.items() if v==0]), set(self.seedSet))
+
+        ## Check that matrix has exactlly two more rows than max(idx_iter.values())
+        self.assertEqual(len(self.X)-2, max(compound_iteration_dict.values()) )
+        self.assertEqual(len(self.Y)-1, max(reaction_iteration_dict.values()) )
+        ## Check that all iterations are present in at least 1 compound in the iteration dict
+        self.assertEqual(len(self.X)-1, len(set(compound_iteration_dict.values())) )
+        self.assertEqual(len(self.Y)-1, len(set(reaction_iteration_dict.values())) )

@@ -354,6 +354,20 @@ class GlobalMetabolicNetwork:
             S[self.cid_to_idx[c],self.rid_to_idx[(r,d)]] = s
 
         return S
+
+    def create_iteration_dict(self,M,idx_to_id):
+        idx_iter = dict()
+        for i,row in enumerate(M):
+            idxs = np.nonzero(row.toarray().T[0])[0]
+            for idx in idxs:
+                if idx not in idx_iter:
+                    idx_iter[idx] = i
+
+        id_iter = dict()
+        for idx,i in idx_iter.items():
+            id_iter[idx_to_id[idx]] = i  
+
+        return id_iter
         
     def expand(self,seedSet,algorithm='naive'):
         # constructre network from skinny table and create matricies for NE algorithm
@@ -380,21 +394,29 @@ class GlobalMetabolicNetwork:
             x,y = netExp(R,P,x0,b)
         elif algorithm.lower() == 'cr':
             x,y = netExp_cr(R,P,x0,b)
+        elif algorithm.lower() == 'trace':
+            X,Y = netExp_trace(R,P,x0,b)
         else:
             raise ValueError('algorithm needs to be naive (compound stopping criteria) or cr (reaction/compound stopping criteria)')
         
-        # convert to list of metabolite ids and reaction ids
-        if x.toarray().sum() > 0:
-            cidx = np.nonzero(x.toarray().T[0])[0]
-            compounds = [self.idx_to_cid[i] for i in cidx]
-        else:
-            compounds = []
-            
-        if y.toarray().sum() > 0:
-            ridx = np.nonzero(y.toarray().T[0])[0]
-            reactions = [self.idx_to_rid[i] for i in ridx]
-        else:
-            reactions = [];
-            
-        return compounds,reactions
+        if algorithm.lower() == 'trace':
+    
+            compound_iteration_dict = self.create_iteration_dict(X,self.idx_to_cid)
+            reaction_iteration_dict = self.create_iteration_dict(Y,self.idx_to_rid)
+            return compound_iteration_dict, reaction_iteration_dict
 
+        else:
+            # convert to list of metabolite ids and reaction ids
+            if x.toarray().sum() > 0:
+                cidx = np.nonzero(x.toarray().T[0])[0]
+                compounds = [self.idx_to_cid[i] for i in cidx]
+            else:
+                compounds = []
+                
+            if y.toarray().sum() > 0:
+                ridx = np.nonzero(y.toarray().T[0])[0]
+                reactions = [self.idx_to_rid[i] for i in ridx]
+            else:
+                reactions = [];
+                
+            return compounds,reactions
