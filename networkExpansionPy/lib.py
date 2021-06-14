@@ -309,9 +309,12 @@ class GlobalMetabolicNetwork:
             rns.append(rn)
 
         res = pd.DataFrame({'rn':rns,'direction':dirs,'effDeltaG':dgs})
-        if ~keepnan:
+        if not keepnan:
             res = res.dropna()
-        
+        else:
+            # change effective free energy to negative number, so it passes the next filter
+            res['effDeltaG'] = res['effDeltaG'].fillna(-1)
+
         #res = res[res['effDeltaG'] < 0].set_index(['rn','direction'])
         res = res[~(res['effDeltaG'] > 0)].set_index(['rn','direction'])
         res = res.drop('effDeltaG',axis=1)
