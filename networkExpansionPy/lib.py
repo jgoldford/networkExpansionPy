@@ -358,6 +358,27 @@ class GlobalMetabolicNetwork:
 
         return S
 
+
+    def create_RP_from_irreversible_network(self):
+        
+        # only use entries in teh network dataframe with s < 0:
+        reactant_network = self.network[self.network.s<0]
+
+        R = np.zeros([len(self.cid_to_idx),len(self.rid_to_idx)])
+        
+        for c,r,d,s in zip(reactant_network["cid"],reactant_network["rn"],reactant_network["direction"],reactant_network["s"]):
+            R[self.cid_to_idx[c],self.rid_to_idx[(r,d)]] = 1
+
+        # only use entries in teh network dataframe with s > 0:
+        product_network = self.network[self.network.s>0]
+
+        P = np.zeros([len(self.cid_to_idx),len(self.rid_to_idx)])
+        
+        for c,r,d,s in zip(product_network["cid"],product_network["rn"],product_network["direction"],product_network["s"]):
+            P[self.cid_to_idx[c],self.rid_to_idx[(r,d)]] = 1
+
+        return R,P
+
     def create_iteration_dict(self,M,idx_to_id):
         idx_iter = dict()
         for i,row in enumerate(M):
@@ -379,10 +400,12 @@ class GlobalMetabolicNetwork:
         # if (self.cid_to_idx is None) or (self.idx_to_cid is None):
         self.cid_to_idx, self.idx_to_cid = self.create_compound_dicts()
         # if self.S is None:
-        self.S = self.create_S_from_irreversible_network()
+        #self.S = self.create_S_from_irreversible_network()
         x0 = self.initialize_metabolite_vector(seedSet)
-        R = (self.S < 0)*1
-        P = (self.S > 0)*1
+        
+        #R = (self.S < 0)*1
+        #P = (self.S > 0)*1
+        R,P = self.create_RP_from_irreversible_network()
         b = sum(R)
 
         # sparsefy data
