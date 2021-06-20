@@ -446,3 +446,33 @@ class GlobalMetabolicNetwork:
                 reactions = [];
                 
             return compounds,reactions
+
+
+    def ne_output_to_graph(self,cpds,rxns):
+	    # build a network constructing metabolites from prior iteration to connecting subsequent iteration
+	    # input: cpds (rxns) is a dict with compound id (reaction id) as the key, and iteration as the value
+	    # output: dataframe with target and source node and iteration for  
+
+	    graph = {'target': [], 'source': [], 'iteration':[]}
+	    maxIter = np.array(list(cpds.values())).max()
+	    
+	    cpd_iter_df = pd.DataFrame({'cid': [x[0] for x in cpds.items()],'iter': [x[1] for x in cpds.items()]})
+
+	    for i in range(maxIter,0,-1):
+	        molecules = [x[0] for x in cpds.items() if x[1] == i]
+	        reactions = [x[0] for x in rxns.items() if x[1] == i]
+	        reactions = self.network.set_index(['rn','direction']).loc[reactions]
+	        for molecule in molecules:
+	            # reactions
+	            # find any reactions that produce this metabolite
+	            r_sample = reactions[ ( reactions.cid == molecule) & (reactions.s>0)].sample(1)
+	            # find metabolite in reaction that was produced in previous iteration
+	            r_sample_cpds = reactions.loc[r_sample.index].set_index('cid').join(cpd_iter_df.set_index('cid'))
+	            r_sample_cpds = r_sample_cpds[r_sample_cpds.iter == i-1].sample(1)
+	            molecules_origin = r_sample_cpds.index.tolist()[0]
+	            graph['target'].append(molecule)
+	            graph['source'].append(molecules_origin)
+	            graph['iteration'].append(i)
+
+	    graph = pd.DataFrame(graph)
+	    return graph
