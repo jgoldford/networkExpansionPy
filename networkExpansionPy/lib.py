@@ -320,6 +320,13 @@ class GlobalMetabolicNetwork:
         res = res.drop('effDeltaG',axis=1)
         self.network = res.join(self.network.set_index(['rn','direction'])).reset_index()
     
+    def pruneReactionsFromMetabolite(self,cpds):
+        # find all reactions that use metabolites in cpds list
+        reactions_to_drop = self.network[self.network.cid.isin(cpds)].rn.unique().tolist()
+        reactions_to_keep = [x for x in self.network.rn.unique().tolist() if x not in reactions_to_drop]
+        # only keep reactions that do not use that metabolite
+        self.subnetwork(reactions_to_keep)
+
     def initialize_metabolite_vector(self,seedSet):
         if seedSet is None:
             print('No seed set')
