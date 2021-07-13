@@ -27,6 +27,12 @@ def initialze_cc(pH=7.0,pMg=3.0,temperature=298.15,ionic_strength=0.25):
 	cc.temperature = Q_(str(temperature) + "K")
 	return cc
 
+
+def isCoenzyme(charged,uncharged,rxnDf):
+	# determine if charge and uncharged 
+	isCoenzymeRxn = (all([y in rxnDf.cid.tolist() for y in [runcharged,charged]])) & (rxnDf[rxnDf.cid.isin([uncharged,charged])].s.sum() == 0)
+	return isCoenzymeRxn
+
 def replace_coenzymes(metabolism,coenzymes,pH=7.0,pMg=3.0,temperature=298.15,ionic_strength=0.25):
 
 	cc = initialze_cc(pH=pH,pMg=pMg,temperature=temperature,ionic_strength=ionic_strength)
@@ -48,6 +54,45 @@ def replace_coenzymes(metabolism,coenzymes,pH=7.0,pMg=3.0,temperature=298.15,ion
 	                dg = computeFreeEnergy(dff,cc)
 	                thermo_new['rn'].append(new_rid)
 	                thermo_new['dg'].append(dg)
+
+	thermo_new = pd.DataFrame(thermo_new)
+	new_rxns = pd.concat(new_rxns).drop('stoich_str',axis=1)
+	thermo_new.columns = ['!MiriamID::urn:miriam:kegg.reaction', '!dG0_prime (kJ/mol)']
+	metabolism.thermo = pd.concat([metabolism.thermo,thermo_new],axis=0)
+	metabolism.network = pd.concat([metabolism.network,new_rxns],axis=0)
+	return metabolism
+
+
+def substituteCoenzyme(metabolism,coenzyme_substitution_df,label,pH=7.0,pMg=3.0,temperature=298.15,ionic_strength=0.25):
+	cc = initialze_cc(pH=pH,pMg=pMg,temperature=temperature,ionic_strength=ionic_strength)
+	#metabolism is a metabolism object from the networkExpansionPy package
+	#coenzyme_substitution_df is a table with the follwing columns: cid,s,type, where type is either o or m (original vs modified)
+	new_rxns = []
+	thermo_new = {'rn': [], 'dg': []}
+	new_rxns = []
+	cj = coenzyme_substitution_df[coenzyme_substitution_df.type == 'o'];
+	cj.columns = [x + '_o' for x in cj.columns]
+
+	for rn,dff in metabolism.network.groupby('rn'):
+	    dff_c = dff[dff.cid.isin(cj.cid_o.tolist())]
+	    dff_i = dff[~dff.cid.isin(cj.cid_o.tolist())]
+	    if len(dff_c) == len(cj):
+	        coenzyme_rxn_df = dff_c.set_index('cid').join(cj.set_index('cid_o'))
+	        factor = coenzyme_rxn_df['s'] / coenzyme_rxn_df['s_o']
+	        # add step here to ensure factor is the same for each original coenzymes
+	        factor = factor.iloc[0]
+	        new_coenzymes = coenzyme_substitution_df[coenzyme_substitution_df.type == 'm']
+	        co_new = coenzyme_substitution_df[coenzyme_substitution_df.type == 'm']
+	        co_new['s'] = co_new['s'].apply(lambda x: x*factor)
+	        #co_new['s'] = co_new['s'] * factor
+	        dff_rn = pd.concat([dff_i[['cid','s']],co_new[['cid','s']]],axis=0)
+	        new_rid = rn + '_' + label
+	       	dff_rn['rn'] = new_rid
+	        dff_rn = dff_rn[['cid','rn','s']]
+	        new_rxns.append(dff_rn)
+	        dg = computeFreeEnergy(dff_rn,cc)
+	        thermo_new['rn'].append(new_rid)
+	        thermo_new['dg'].append(dg)
 
 	thermo_new = pd.DataFrame(thermo_new)
 	new_rxns = pd.concat(new_rxns).drop('stoich_str',axis=1)
