@@ -122,6 +122,29 @@ def load_json_network(rdict):
                 consistent_rids.append(rid)
     return pd.DataFrame(network_list,columns=("cid","rn","s")), pd.DataFrame(consistent_rids,columns=["rn"])
 
+def _load_tuple_network(tlist):
+    """
+    Load a simple network, defined by 2-tuples of reactant lists and product lists
+    
+    Note: Intended for DEV only
+    Note: Stoichiometry information in output is only accurate for directionality
+    
+        tlist_example = [
+             (["A","B"],["C"]),
+             (["C","D"],["E","F"]),
+             (["E","F"],["G"]),
+             (["G","H"],["I"]),
+             (["A","J"],["I"])]
+    """
+    rows = list()
+    for i,d in enumerate(tlist):
+        if len(d)!=2: raise ValueError("reactions must be two-tuples")
+        for cid in d[0]:
+            rows.append({"rn":i, "cid":cid, "s":-1})
+        for cid in d[1]:
+            rows.append({"rn":i, "cid":cid, "s":1})
+    return pd.DataFrame(rows)
+
 class GlobalMetabolicNetwork:
     
     def __init__(self,metabolism="KEGG_OG"):
@@ -150,6 +173,10 @@ class GlobalMetabolicNetwork:
             self.network = network
             self.consistent_rxns = consistent_rxns
             self.compounds = pd.DataFrame(self.network["cid"].unique(),columns=["cid"]) ## Only includes compounds with reactions
+
+        elif metabolism == "dev":
+            ## Just for testing, etc.
+            self.network = None
 
         else:
             raise(ValueError("'metabolism' must be one of 'KEGG_OG, 'ecg', 'KEGG'"))
