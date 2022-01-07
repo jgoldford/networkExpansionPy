@@ -19,6 +19,11 @@ def folds2rn(rules_sub,foldSet):
     feasible = rules_sub['fold_sets'].apply(lambda x: rule2rn(foldSet,x))
     rns = rules_sub[feasible].rn.unique().tolist()
     return rns
+    
+def folds2rules(rules_sub,foldSet):
+    feasible = rules_sub['fold_sets'].apply(lambda x: rule2rn(foldSet,x))
+    rule_df = rules_sub[feasible]
+    return rule_df
 
 
 class FoldRules:
