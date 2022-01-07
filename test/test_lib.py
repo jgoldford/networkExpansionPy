@@ -2,6 +2,12 @@ import unittest
 import networkExpansionPy.lib as ne
 import pandas as pd
 from scipy.sparse import csr_matrix
+# from pandas.testing import assert_frame_equal
+
+def dfs_have_equal_content(df1,df2):
+    ## Ignores row order and index
+    return df1.sort_values(by=list(df1.columns),axis=0).reset_index(drop=True).equals(df2.sort_values(by=list(df2.columns),axis=0).reset_index(drop=True))
+
 
 class TestGlobalMetabolicNetworkInit(unittest.TestCase):
 
@@ -140,3 +146,142 @@ class Test_create_iteration_dict(unittest.TestCase):
         ## Check that all iterations are present in at least 1 compound in the iteration dict
         self.assertEqual(len(self.X)-1, len(set(compound_iteration_dict.values())) )
         self.assertEqual(len(self.Y)-1, len(set(reaction_iteration_dict.values())) )
+
+
+class TestLoadTupleNetwork(unittest.TestCase):
+
+    def test_tuple_len_throws(self):
+
+        with self.assertRaises(ValueError):
+            ne._load_tuple_network([([1])])
+
+        with self.assertRaises(ValueError):
+            ne._load_tuple_network([([1],[2],[3])])
+
+        rxns = [
+             (["A","B"],["C"]),
+             (["C","D"],["E","F"]),
+             (["E","F"],["G"]),
+             (["G","H"],["I"]),
+             (["A","J"],["I"])]
+
+        expected_df = pd.DataFrame(
+            [{'rn': 0, 'cid': 'A', 's': -1},
+            {'rn': 0, 'cid': 'B', 's': -1},
+            {'rn': 0, 'cid': 'C', 's': 1},
+            {'rn': 1, 'cid': 'C', 's': -1},
+            {'rn': 1, 'cid': 'D', 's': -1},
+            {'rn': 1, 'cid': 'E', 's': 1},
+            {'rn': 1, 'cid': 'F', 's': 1},
+            {'rn': 2, 'cid': 'E', 's': -1},
+            {'rn': 2, 'cid': 'F', 's': -1},
+            {'rn': 2, 'cid': 'G', 's': 1},
+            {'rn': 3, 'cid': 'G', 's': -1},
+            {'rn': 3, 'cid': 'H', 's': -1},
+            {'rn': 3, 'cid': 'I', 's': 1},
+            {'rn': 4, 'cid': 'A', 's': -1},
+            {'rn': 4, 'cid': 'J', 's': -1},
+            {'rn': 4, 'cid': 'I', 's': 1}])
+
+        self.assertTrue(dfs_have_equal_content(ne._load_tuple_network(rxns),expected_df))
+
+
+class TestGlobalMetabolicNetworkExpand(unittest.TestCase):
+
+    def setUp(self):
+        self.toy = ne.GlobalMetabolicNetwork("dev")
+        rnxs = [
+            (["A","B"],["C"]),
+            (["C","D"],["E","F"]),
+            (["E","F"],["G"]),
+            (["G","H"],["I"]),
+            (["A","J"],["I"])]
+
+        self.toy.network = ne._load_tuple_network(rnxs)
+        self.toy.convertToIrreversible()
+
+    def test_expansion_1(self):
+
+        compounds, reactions = self.toy.expand(["A","B","D","H"],"trace")
+
+        expected_compounds = {'H': 0,
+                            'B': 0,
+                            'D': 0,
+                            'A': 0,
+                            'C': 1,
+                            'F': 2,
+                            'E': 2,
+                            'G': 3,
+                            'I': 4,
+                            'J': 5}
+
+        expected_reactions = {(0, 'forward'): 1,
+                            (0, 'reverse'): 2,
+                            (1, 'forward'): 2,
+                            (2, 'forward'): 3,
+                            (1, 'reverse'): 3,
+                            (2, 'reverse'): 4,
+                            (3, 'forward'): 4,
+                            (4, 'reverse'): 5,
+                            (3, 'reverse'): 5,
+                            (4, 'forward'): 6}
+
+        self.assertEqual(compounds,expected_compounds)
+        self.assertEqual(reactions,expected_reactions)
+
+    def test_expansion_2(self):
+
+        compounds, reactions = self.toy.expand(["I"],"trace")
+
+        expected_compounds = {'I': 0,
+                            'A': 1,
+                            'J': 1,
+                            'G': 1,
+                            'H': 1,
+                            'E': 2,
+                            'F': 2,
+                            'C': 3,
+                            'D': 3,
+                            'B': 4}
+
+        expected_reactions = {(4, 'reverse'): 1,
+                            (4, 'forward'): 2,
+                            (3, 'reverse'): 1,
+                            (3, 'forward'): 2,
+                            (2, 'reverse'): 2,
+                            (2, 'forward'): 3,
+                            (1, 'reverse'): 3,
+                            (1, 'forward'): 4,
+                            (0, 'reverse'): 4,
+                            (0, 'forward'): 5}
+
+        self.assertEqual(compounds,expected_compounds)
+        self.assertEqual(reactions,expected_reactions)
+
+    def test_expansion_3(self):
+
+        compounds, reactions = self.toy.expand(["A","D","E","H"],"trace")
+
+        expected_compounds = {'A': 0,
+                            'D': 0,
+                            'E': 0,
+                            'H': 0}
+
+        expected_reactions = {}
+
+        self.assertEqual(compounds,expected_compounds)
+        self.assertEqual(reactions,expected_reactions)
+
+    def test_expansion_4(self):
+
+        compounds, reactions = self.toy.expand(["C"],"trace")
+
+        expected_compounds = {'C': 0,
+                            'A': 1,
+                            'B': 1}
+
+        expected_reactions = {(0, 'reverse'): 1,
+                            (0, 'forward'): 2}
+
+        self.assertEqual(compounds,expected_compounds)
+        self.assertEqual(reactions,expected_reactions)
