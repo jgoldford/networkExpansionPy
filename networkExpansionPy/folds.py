@@ -17,7 +17,11 @@ def rule2rn(foldSet,x):
     
 def folds2rn(rules_sub,foldSet):
     feasible = rules_sub['fold_sets'].apply(lambda x: rule2rn(foldSet,x))
-    rns = rules_sub[feasible].rn.unique().tolist()
+    y = rules_sub[feasible]
+    if len(y) > 0:
+        rns = rules_sub[feasible].rn.unique().tolist()
+    else:
+        rns = []
     return rns
     
 def folds2rules(rules_sub,foldSet):
