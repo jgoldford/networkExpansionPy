@@ -6,6 +6,7 @@ import os
 import json
 from copy import copy, deepcopy
 import zipfile
+import pickle
 
 # define asset path
 asset_path,filename = os.path.split(os.path.abspath(__file__))
@@ -510,3 +511,11 @@ class GlobalMetabolicNetwork:
 
 	    graph = pd.DataFrame(graph)
 	    return graph
+
+    def save(self,name):
+        path_to_save = asset_path + '/metabolic_networks/' + name + ".pkl"
+        with open(path_to_save, 'wb') as handle:
+            pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+
