@@ -74,6 +74,47 @@ def netExp_trace(R,P,x,b):
     return X,Y
 
 
+
+def netContract(R,P,b,x_ac,y,yext):
+    # code for running network contraction algorithm
+    Xac = []
+    Yac = []
+    
+    #x_ac = x.copy()
+    Xac.append(x_ac)
+    k0 = np.sum(x_ac);
+    n_reactions = np.size(R,1)
+    #yactive = csr_matrix(np.multiply((y.toarray()),1-yext.toarray()))   
+    yactive = yext.__lt__(1).multiply(y)
+    k0 = yactive.sum()
+    Yac.append(yactive)
+    k = 0
+    while k < k0:
+        # find
+        k0 = yactive.sum();
+        x_ex = np.dot(P,yext).astype('bool').astype('int')
+        x_ac = np.dot(P,yactive).astype('bool').astype('int')
+        # find all extinct metabolites
+        #x_ex = csr_matrix(np.multiply((x_ex.toarray()),1-x_ac.toarray()))
+        
+        # metabolite has to be not active and extinct
+        x_ex = x_ac.__lt__(1).multiply(x_ex)
+        
+        #compute extinct reactions
+        yext = np.dot(R.transpose(),x_ex).astype('bool').astype('int')
+        # compute active reactions
+        
+        #yactive = csr_matrix(np.multiply((yactive.toarray()),1-yext.toarray()))   
+        yactive = yext.__lt__(1).multiply(yactive)
+        #k = np.sum(x_ac);
+        k = yactive.sum()
+        Xac.append(x_ac)
+        Yac.append(yactive)
+        
+        
+    return Xac,Yac
+
+
 def parse_reaction_trace(reaction_trace,network):
     rxns_list = []
     for i in range(1,len(reaction_trace)):
@@ -364,6 +405,16 @@ class GlobalMetabolicNetwork:
                 x0[self.cid_to_idx[x]] = 1     
             return x0
 
+    def initialize_reaction_vector(self,reactionSet):
+        if reactionSet is None:
+            print('No reactions in set')
+        else:
+            x0 = np.zeros([len(self.rid_to_idx)],dtype=int)
+            for x in set(reactionSet)&set(self.rid_to_idx.keys()):
+                x0[self.rid_to_idx[x]] = 1     
+            return x0
+
+
     def create_reaction_dicts(self):
         rids = set(zip(self.network["rn"],self.network["direction"]))
         rid_to_idx = dict()
@@ -481,6 +532,57 @@ class GlobalMetabolicNetwork:
                 reactions = [];
                 
             return compounds,reactions
+
+
+    def contract(self,seedSet,reactionScope,compoundScope,extinctReactions):
+        # constructre network from skinny table and create matricies for NE algorithm
+        # if (self.rid_to_idx is None) or (self.idx_to_rid is None):
+        self.rid_to_idx, self.idx_to_rid = self.create_reaction_dicts()
+        # if (self.cid_to_idx is None) or (self.idx_to_cid is None):
+        self.cid_to_idx, self.idx_to_cid = self.create_compound_dicts()
+        # if self.S is None:
+        #self.S = self.create_S_from_irreversible_network()
+        
+        # create vectors for reactionScope, compoundScope
+        xactive = self.initialize_metabolite_vector(compoundScope)
+        yactive = self.initialize_reaction_vector(reactionScope)
+        yextinct = self.initialize_reaction_vector(extinctReactions)
+        #R = (self.S < 0)*1
+        #P = (self.S > 0)*1
+        R,P = self.create_RP_from_irreversible_network()
+        b = sum(R)
+
+        # sparsefy data
+        R = csr_matrix(R)
+        P = csr_matrix(P)
+        b = csr_matrix(b)
+        b = b.transpose()
+
+        #x0 = csr_matrix(x0)
+        #x0 = x0.transpose()
+        xactive = csr_matrix(xactive).transpose()
+        yactive = csr_matrix(yactive).transpose()
+        yextinct = csr_matrix(yextinct).transpose()
+        # reun contraction algorithm
+        X,Y = netContract(R,P,b,xactive,yactive,yextinct)
+        x = X[-1]
+        y = Y[-1]
+
+        # convert to list of metabolite ids and reaction ids
+        if x.toarray().sum() > 0:
+            cidx = np.nonzero(x.toarray().T[0])[0]
+            compounds = [self.idx_to_cid[i] for i in cidx]
+        else:
+            compounds = []
+            
+        if y.toarray().sum() > 0:
+            ridx = np.nonzero(y.toarray().T[0])[0]
+            reactions = [self.idx_to_rid[i] for i in ridx]
+        else:
+            reactions = [];
+            
+        return compounds,reactions
+
 
 
     def ne_output_to_graph(self,cpds,rxns):
