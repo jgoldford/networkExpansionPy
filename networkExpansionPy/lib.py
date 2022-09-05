@@ -583,6 +583,148 @@ class GlobalMetabolicNetwork:
             
         return compounds,reactions
 
+    def run_expansions(self,seedSets):
+        # constructre network from skinny table and create matricies for NE algorithm
+        # if (self.rid_to_idx is None) or (self.idx_to_rid is None):
+        self.rid_to_idx, self.idx_to_rid = self.create_reaction_dicts()
+        # if (self.cid_to_idx is None) or (self.idx_to_cid is None):
+        self.cid_to_idx, self.idx_to_cid = self.create_compound_dicts()
+        # if self.S is None:
+        #self.S = self.create_S_from_irreversible_network()
+        
+        #R = (self.S < 0)*1
+        #P = (self.S > 0)*1
+        R,P = self.create_RP_from_irreversible_network()
+        b = sum(R)
+
+        # sparsefy data
+        R = csr_matrix(R)
+        P = csr_matrix(P)
+        b = csr_matrix(b)
+        b = b.transpose()
+
+        compoundScopes = []
+        reactionScopes = []
+        for seedSet in seedSets:
+            x0 = self.initialize_metabolite_vector(seedSet)
+            x0 = csr_matrix(x0)
+            x0 = x0.transpose()
+            x,y = netExp(R,P,x0,b)
+            
+            if x.toarray().sum() > 0:
+                cidx = np.nonzero(x.toarray().T[0])[0]
+                compounds = [self.idx_to_cid[i] for i in cidx]
+            else:
+                compounds = []
+                
+            if y.toarray().sum() > 0:
+                ridx = np.nonzero(y.toarray().T[0])[0]
+                reactions = [self.idx_to_rid[i] for i in ridx]
+            else:
+                reactions = [];
+            compoundScopes.append(compounds)
+            reactionScopes.append(reactions)
+            return compoundScopes,reactionScopes
+
+    def run_contractions(self,seedSet,reactionScope,compoundScope,extinctReactionSets):
+        # constructre network from skinny table and create matricies for NC algorithm
+        # if (self.rid_to_idx is None) or (self.idx_to_rid is None):
+
+        self.rid_to_idx, self.idx_to_rid = self.create_reaction_dicts()
+        # if (self.cid_to_idx is None) or (self.idx_to_cid is None):
+        self.cid_to_idx, self.idx_to_cid = self.create_compound_dicts()
+        # if self.S is None:
+        #self.S = self.create_S_from_irreversible_network()
+        
+        # create vectors for reactionScope, compoundScope
+        xactive = self.initialize_metabolite_vector(compoundScope)
+        yactive = self.initialize_reaction_vector(reactionScope)
+        
+        #R = (self.S < 0)*1
+        #P = (self.S > 0)*1
+        R,P = self.create_RP_from_irreversible_network()
+        b = sum(R)
+
+        # sparsefy data
+        R = csr_matrix(R)
+        P = csr_matrix(P)
+        b = csr_matrix(b)
+        b = b.transpose()
+
+        #x0 = csr_matrix(x0)
+        #x0 = x0.transpose()
+        xactive = csr_matrix(xactive).transpose()
+        yactive = csr_matrix(yactive).transpose()
+     
+
+        compoundScopes = []
+        reactionScopes = []
+
+        for extinctReactions in extinctReactionSets:
+            yextinct = self.initialize_reaction_vector(extinctReactions)
+            yextinct = csr_matrix(yextinct).transpose()
+            # run contraction algorithm
+            X,Y = netContract(R,P,b,xactive,yactive,yextinct)
+            x = X[-1]
+            y = Y[-1]            
+            if x.toarray().sum() > 0:
+                cidx = np.nonzero(x.toarray().T[0])[0]
+                compounds = [self.idx_to_cid[i] for i in cidx]
+            else:
+                compounds = []
+                
+            if y.toarray().sum() > 0:
+                ridx = np.nonzero(y.toarray().T[0])[0]
+                reactions = [self.idx_to_rid[i] for i in ridx]
+            else:
+                reactions = [];
+            compoundScopes.append(compounds)
+            reactionScopes.append(reactions)
+        
+        return compoundScopes,reactionScopes
+
+
+    def run_expansions_reactionMasks(self,seedSet,maskedReactionSets):
+        # run many expansions, but masking with reaction list in the lists maskedReactionSets
+        R,P = self.create_RP_from_irreversible_network()
+        b = sum(R)
+        # sparsefy data
+        R = csr_matrix(R)
+        P = csr_matrix(P)
+        b = csr_matrix(b)
+        b = b.transpose()
+
+        x0 = self.initialize_metabolite_vector(seedSet)
+        x0 = csr_matrix(x0)
+        x0 = x0.transpose()
+
+        compoundScopes = []
+        reactionScopes = []
+
+        for rxns_removed in maskedReactionSets:
+            # build new R and P matricies with Masks
+            yextinct = self.initialize_reaction_vector(rxns_removed)
+            reaction_mask = csr_matrix(np.diag(1-yextinct))
+            Pstar = P*reaction_mask
+            Rstar = R*reaction_mask
+            # run contraction algorithm
+            x,y = netExp(Rstar,Pstar,x0,b)
+
+            if x.toarray().sum() > 0:
+                cidx = np.nonzero(x.toarray().T[0])[0]
+                compounds = [self.idx_to_cid[i] for i in cidx]
+            else:
+                compounds = []
+                
+            if y.toarray().sum() > 0:
+                ridx = np.nonzero(y.toarray().T[0])[0]
+                reactions = [self.idx_to_rid[i] for i in ridx]
+            else:
+                reactions = [];
+            compoundScopes.append(compounds)
+            reactionScopes.append(reactions)
+        
+        return compoundScopes,reactionScopes
 
 
     def ne_output_to_graph(self,cpds,rxns):
