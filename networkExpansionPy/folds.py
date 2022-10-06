@@ -8,13 +8,15 @@ asset_path,filename = os.path.split(os.path.abspath(__file__))
 asset_path = asset_path + '/assets'
 
 
+# define a function that determins if a reaction rule (x) is feasible with foldSet
 def rule2rn(foldSet,x):
     if x.issubset(foldSet):
     #if foldSet.issubset(x)
         return True
     else:
         return False
-    
+
+# define a function that returns a list of reactions that are feasible with foldSet.  rules_sub contains all the fold set rules for all reactions
 def folds2rn(rules_sub,foldSet):
     feasible = rules_sub['fold_sets'].apply(lambda x: rule2rn(foldSet,x))
     y = rules_sub[feasible]
@@ -23,13 +25,15 @@ def folds2rn(rules_sub,foldSet):
     else:
         rns = []
     return rns
-    
+
+# same as above but return only the set of rules that are feasible
 def folds2rules(rules_sub,foldSet):
     feasible = rules_sub['fold_sets'].apply(lambda x: rule2rn(foldSet,x))
     rule_df = rules_sub[feasible]
     return rule_df
 
 
+# define a fold rules object, which simply contains fold sets that enable reactions
 class FoldRules:
     
     def __init__(self):
@@ -40,7 +44,7 @@ class FoldRules:
         
     def copy(self):
         return deepcopy(self)
-        
+
     def setRules(self,path = '/ecode/ecod2rn.ec3.07Feb2021.csv'):
         rules = pd.read_csv(asset_path + path)
         self.rns = rules.rn.unique().tolist()
@@ -75,10 +79,19 @@ class FoldRules:
     
 # define a function to run network expansion using a fold set
 # depends on metabolism object and foldRules objects
-def fold_expansion(metabolism,foldRules,fold_set,cpd_set,rxns_seed):
-    rxns_feasible = foldRules.folds2reactions(fold_set)
-    rxns_total = list(rxns_feasible) + list(rxns_seed)
-    m = metabolism.copy()
-    m.subnetwork(rxns_total)
-    cpds_ne,rxns_ne = m.expand(list(cpd_set))
-    return cpds_ne,rxns_ne,rxns_feasible
+# OLD FOLD EXPANSION CODE: REPLACED 10/5 W FASTER VERSION
+#def fold_expansion(metabolism,foldRules,fold_set,cpd_set,rxns_seed):
+#    rxns_feasible = foldRules.folds2reactions(fold_set)
+#    rxns_total = list(rxns_feasible) + list(rxns_seed)
+#    m = metabolism.copy()
+#    m.subnetwork(rxns_total)
+#    cpds_ne,rxns_ne = m.expand(list(cpd_set))
+#    return cpds_ne,rxns_ne,rxns_feasible
+
+
+#function that peforms fold expansion
+def fold_expansion(metabolism,foldRules,fold_set,cpds_set,rxns_seed):
+    rn_list = foldRules.folds2reactions(fold_set)
+    rn_list = metabolism.rxns2tuple(rn_list) + list(rxns_seed)
+    cx,rx = metabolism.expand(cpds_set,reaction_mask=rn_list)
+    return cx,rx,rn_list

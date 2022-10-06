@@ -479,7 +479,7 @@ class GlobalMetabolicNetwork:
 
         return id_iter
         
-    def expand(self,seedSet,algorithm='naive'):
+    def expand(self,seedSet,algorithm='naive',reaction_mask = None):
         # constructre network from skinny table and create matricies for NE algorithm
         # if (self.rid_to_idx is None) or (self.idx_to_rid is None):
         self.rid_to_idx, self.idx_to_rid = self.create_reaction_dicts()
@@ -499,6 +499,13 @@ class GlobalMetabolicNetwork:
         P = csr_matrix(P)
         b = csr_matrix(b)
         b = b.transpose()
+
+        # add a new term that uses sparse matrix multiplication for R and P to zero out reactions are that are not accessible
+        if reaction_mask is not None:
+        	reaction_mask = self.initialize_reaction_vector(reaction_mask)
+        	reaction_mask = csr_matrix(np.diag(reaction_mask))
+        	P = P*reaction_mask
+        	R = R*reaction_mask
 
         x0 = csr_matrix(x0)
         x0 = x0.transpose()
@@ -761,5 +768,7 @@ class GlobalMetabolicNetwork:
         with open(path_to_save, 'wb') as handle:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-
-
+    def rxns2tuple(self,rn_list):
+    	t = self.network[self.network.rn.isin(rn_list)][['rn','direction']].drop_duplicates()
+    	rn_list_tuple = list(zip(t.rn.tolist(),t.direction.tolist()))
+    	return rn_list_tuple
