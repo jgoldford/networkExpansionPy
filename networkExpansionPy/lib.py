@@ -631,7 +631,7 @@ class GlobalMetabolicNetwork:
                 reactions = [];
             compoundScopes.append(compounds)
             reactionScopes.append(reactions)
-            return compoundScopes,reactionScopes
+        return compoundScopes,reactionScopes
 
     def run_contractions(self,seedSet,reactionScope,compoundScope,extinctReactionSets):
         # constructre network from skinny table and create matricies for NC algorithm
