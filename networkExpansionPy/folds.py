@@ -82,17 +82,6 @@ class FoldRules:
         folds_remove_list = list(folds_remove)
         self.folds = [x for x in self.folds if x not in folds_remove_list]
 
-# define a function to run network expansion using a fold set
-# depends on metabolism object and foldRules objects
-# OLD FOLD EXPANSION CODE: REPLACED 10/5 W FASTER VERSION
-#def fold_expansion(metabolism,foldRules,fold_set,cpd_set,rxns_seed):
-#    rxns_feasible = foldRules.folds2reactions(fold_set)
-#    rxns_total = list(rxns_feasible) + list(rxns_seed)
-#    m = metabolism.copy()
-#    m.subnetwork(rxns_total)
-#    cpds_ne,rxns_ne = m.expand(list(cpd_set))
-#    return cpds_ne,rxns_ne,rxns_feasible
-
 class FoldMetabolism:
 
     def __init__(self, metabolism, foldRules, preexpansion=False):
