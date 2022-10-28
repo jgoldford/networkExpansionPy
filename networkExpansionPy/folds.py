@@ -1,3 +1,4 @@
+from operator import index
 import numpy as np
 import pandas as pd
 from pathlib import PurePath, Path
@@ -36,7 +37,7 @@ class FoldRules:
     def __init__(self):
         # load the data
         self.rules = None;
-        self.rn = None
+        self.foldrns = None
         self.folds = None;
         
     def copy(self):
@@ -44,8 +45,8 @@ class FoldRules:
 
     def setRules(self,path = PurePath("ecode","ecod2rn.ec3.07Feb2021.csv")):
         ecode2rn_path = asset_path / path
-        rules = pd.read_csv(ecode2rn_path)
-        self.rns = rules.rn.unique().tolist()
+        rules = pd.read_csv(ecode2rn_path, index_col=[0]).reset_index(drop=True)
+        self.foldrns = rules.rn.unique().tolist()
         folds =  rules['rule'].apply(lambda x: set(x.split('_')))
         folds = [item for sublist in folds for item in sublist]
         self.folds = list(set(folds))
@@ -74,7 +75,7 @@ class FoldRules:
         self.rules = self.rules[~rulesRemoval]
         folds_remove_list = list(folds_remove)
         self.folds = [x for x in self.folds if x not in folds_remove_list]
-    
+
 # define a function to run network expansion using a fold set
 # depends on metabolism object and foldRules objects
 # OLD FOLD EXPANSION CODE: REPLACED 10/5 W FASTER VERSION
@@ -85,6 +86,14 @@ class FoldRules:
 #    m.subnetwork(rxns_total)
 #    cpds_ne,rxns_ne = m.expand(list(cpd_set))
 #    return cpds_ne,rxns_ne,rxns_feasible
+
+class FoldMetabolism:
+
+    def __init__(self):
+        # load the data
+        self.rules = None;
+        self.foldrns = None
+        self.folds = None;
 
 
 #function that peforms fold expansion
