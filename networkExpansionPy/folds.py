@@ -1,12 +1,9 @@
 import numpy as np
 import pandas as pd
-import os
+from pathlib import PurePath, Path
 from copy import copy, deepcopy
 
-# define asset path
-asset_path,filename = os.path.split(os.path.abspath(__file__))
-asset_path = asset_path + '/assets'
-
+asset_path = PurePath(__file__).parent / "assets"
 
 # define a function that determins if a reaction rule (x) is feasible with foldSet
 def rule2rn(foldSet,x):
@@ -45,8 +42,9 @@ class FoldRules:
     def copy(self):
         return deepcopy(self)
 
-    def setRules(self,path = '/ecode/ecod2rn.ec3.07Feb2021.csv'):
-        rules = pd.read_csv(asset_path + path)
+    def setRules(self,path = PurePath("ecode","ecod2rn.ec3.07Feb2021.csv")):
+        ecode2rn_path = asset_path / path
+        rules = pd.read_csv(ecode2rn_path)
         self.rns = rules.rn.unique().tolist()
         folds =  rules['rule'].apply(lambda x: set(x.split('_')))
         folds = [item for sublist in folds for item in sublist]
