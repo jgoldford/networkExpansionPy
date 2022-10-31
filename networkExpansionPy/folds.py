@@ -84,12 +84,14 @@ class FoldRules:
 
 class GlobalFoldNetwork:
 
-    def __init__(self, rn2rules):
+    def __init__(self, rn2rules, fold_independent_rns):
 
         self.rn2rules = rn2rules ## all rns to fold rules
         self.rules2rn = self.create_foldrules2rn(rn2rules) ## all fold rules to rns
         self.rns = set(rn2rules.keys()) ## reactions in fold network only
         self.folds = set([i for fs in self.rules2rn.keys() for i in fs]) ## all folds
+        print("GlobalFoldNetwork initialized\n%i folds available in RUN",len(folds))
+        self.fold_independent_rns = fold_independent_rns
         # self.cpds = None ## compounds in fold network only. this would require the mapping from reactions to compounds via metabolism
 
 
@@ -109,22 +111,23 @@ class FoldMetabolism:
     A re-write of FoldMetabolism to handle doing network expansion with folds
     """
 
-    def __init__(self, metabolism, rn2rules, preexpansion=False):
+    def __init__(self, metabolism, foldnet, preexpansion=False):
         # load the data
-        self.metabolism = metabolism ## Metabolism object
-        self.rn2rules = rn2rules ## all rns to fold rules
-        self.rules2rn = self.create_foldrules2rn(rn2rules) ## all fold rules to rns
-        self.all_folds = set([i for fs in self.rules2rn.keys() for i in fs]) ## All possible folds ever; doesn't depent on seed set
-        self.current_folds = None
+        self._m = metabolism ## Metabolism object
+        self._f = foldnet
 
         self.seed_folds = None
-        self.seed_cpds = None
-        self.maximum_scope_calculated = False
-        self.maximum_scope_cpds = None
-        self.maximum_scope_rns = None
-        self.maximum_scope_folds = None
+        self._seed_cpds = None
 
-        # maximum_scope(cpds_set)
+        self.scope_cpds = None
+        self.scope_rns = None
+        self.scope_folds = None
+        self.scope_rules2rn = None
+        self.scope_rn2rules = None
+
+        self.current_folds = None
+
+        # calculate_scope(cpds_set)
 
         # self.all_rns = None ## All possible reactions ever; doens't depend on seed set
         ## A few different things
@@ -132,12 +135,51 @@ class FoldMetabolism:
         ## fold.rns_all -- all reactions associated with fold universe
         ## fold.rns_i -- all reactions associated with current fold expansion state
         # self.all_cpds = None ## All possible compounds ever; doesnt depend on seed set
+
+    ## Disallow changing metabolism or foldnet after initialization b/c no setter
+    @property 
+    def metabolism(self):
+        return self._m
+    
+    @property 
+    def foldnet(self):
+        return self._f
+
+    ## Changing the seed_cpds after initializations recalcuates scope properties
+    @property
+    def seed_cpds(self):
+        return self._seed_cpds
+
+    @seed_cpds.setter
+    def seed_cpds(self, seed_cpds):
+        """
+        Calculates properties associated with seed compounds if setting to a new set of seeds
+        """
+        if (self._seed_cpds == None) or (self._seed_cpds != seed_cpds):
+            self._seed_cpds = seed_cpds 
+            self.scope_cpds, self.scope_rns = calculate_scope(self._seed_cpds)
+            self.scope_rn2rules = {k:v for k,v in self._f.rn2rules if k in self.scope_rns}
+            self.scope_rules2rn = create_foldrules2rn(self.scope_rn2rules)
+            self.scope_folds = set([i for fs in self.scope_rules2rn.keys() for i in fs])
+            print("Folds in RUN reduced to overlap with scope\n%i folds available in RUN",len(folds))
+
+        else:
+            pass 
+                
+    def calculate_scope(self, seed_cpds):
+        ## This is the scope with all reactions in KEGG. 
+        ##   But if I wanted I could restrict this to reactions which are only in the folds, or foldindependentreactions, which is a subset of KEGG
+        scope_cpds, scope_rns = (set(i) for i in self._m.expand(seed_cpds, reaction_mask=(self._f.rns | self._f.fold_independent_rns)))
+
+    # def filter_to_rules_in_maxiumum_scope(self):
+    #     rules2rn = dict()
+    #     for k,v in self._f.rules2rn.items():
+    #         v_intersect = v & self.scope_rns
+    #         if len(v_intersect) > 0:
+    #             rules2rn[k] = v_intersect
         
-
-    def maximum_scope(self, seed_cpds):
-        self.maximum_scope_cpds, self.maximum_scope_rns = self.metabolism.expand(seed_cpds)
-        self.maximum_scope_calculated = True
-
+    #     return rules2rn
+            
     def create_foldrules2rn(self, rn2fold):
         fold2rn = dict()
         for rn, rules in rn2fold.items():
@@ -146,7 +188,7 @@ class FoldMetabolism:
                     fold2rn[fs].add(rn)
                 else:
                     fold2rn[fs] = set([rn])
-        self.rules2rn = fold2rn
+        return fold2rn
 
     def create_foldrule2subset(fold2rn):
         """
@@ -176,7 +218,38 @@ class FoldMetabolism:
         
         return fold2foldsubset, fold2foldstrictsubset, fold2equalfold
 
-    def find_superset_folds(self, future_fold2rns):
+    def filter_next_iter_to_folds_enabling_new_reactions(self, current_folds):
+        """
+        Create a mapping of fold:{rns}, where {rns} are the reactions enabled by adding the fold to the existing foldset.
+
+        Mapping discards folds which don't enable any new reactions.
+
+        Used to narrow down possible folds for the next iteration of fold expansion.
+        """
+        ## I don't think we need to provide existing reactions, because that should be inferabble from the exstiing folds, right?
+        ## Well, not all those reactions are reachable from the current state of compounds...
+
+        ## Don't ever try a fold which can't give you any reactions
+
+        ## Don't ever try a fold which can only give you a subset of reactions that adding a different fold could give you, unless you care about ties, in which case you should flag that as a kwarg.
+        # fold2foldsubset, fold2foldsmallersubset = create_foldrule2subset(rules2rn)
+        
+        future_fold2rns = dict()
+        for fold in self.scope_folds-current_folds:
+            future_folds = current_folds | set([fold])
+            future_foldrules2rns = {k:v for k,v in self.scope_rules2rn.items() if k <= future_folds}
+            future_rns = set([rn for v in future_foldrules2rns.values() for rn in v])
+            future_fold2rns[fold] = future_rns
+
+        current_fold2rn = {k:v for k,v in self.scope_rules2rn.items() if k <= current_folds}
+        current_rns = set([rn for v in current_fold2rn.values() for rn in v])
+        folds_enabling_no_new_reactions = set([k for k,v in future_fold2rns.items() if v==current_rns])
+        print("Folds enabling no new reactions during the next NEXT ITERATION removed\n%i folds available for the NEXT ITERATION",len(folds_enabling_no_new_reactions))
+
+        ## need to ouput if a fold doesn't do anything either--that is, by its addition to the existing foldset, it won't be able to enable any new reactions
+        return {k:v for k,v in future_fold2rns if k not in folds_enabling_no_new_reactions}
+
+    def filter_next_iter_to_foldsupersets(self, future_fold2rns):
         """
         Narrow down which future folds need to be expanded based on redundancy of reactions enabled across folds.
 
@@ -200,46 +273,53 @@ class FoldMetabolism:
         ## Only need to expand 1. strict superset folds, and 2. one fold from each equal_fold_group, provided that group is not in strictsubset_folds
         return strictsuperset_folds | smallest_number_fold_from_each_group
 
-    def find_folds_enabling_new_reactions(self):
-        """
-        Create a mapping of fold:{rns}, where {rns} are the reactions enabled by adding the fold to the existing foldset
-
-        Mapping discards folds which don't enable any new reactions
-        """
-        ## I don't think we need to provide existing reactions, because that should be inferabble from the exstiing folds, right?
-        ## Well, not all those reactions are reachable from the current state of compounds...
-
-        ## Don't ever try a fold which can't give you any reactions
-
-        ## Don't ever try a fold which can only give you a subset of reactions that adding a different fold could give you, unless you care about ties, in which case you should flag that as a kwarg.
-        # fold2foldsubset, fold2foldsmallersubset = create_foldrule2subset(rules2rn)
-        
-        future_fold2rns = dict()
-        for fold in self.all_folds-self.current_folds:
-            future_folds = self.current_folds | set([fold])
-            future_foldrules2rns = {k:v for k,v in self.rules2rn.items() if k <= future_folds}
-            future_rns = set([rn for v in future_foldrules2rns.values() for rn in v])
-            future_fold2rns[fold] = future_rns
-
-        current_fold2rn = {k:v for k,v in self.rules2rn.items() if k <= self.current_folds}
-        current_rns = set([rn for v in current_fold2rn.values() for rn in v])
-        folds_enabling_no_new_reactions = set([k for k,v in future_fold2rns.items() if v==current_rns])
-
-        ## need to ouput if a fold doesn't do anything either--that is, by its addition to the existing foldset, it won't be able to enable any new reactions
-        return {k:v for k,v in future_fold2rns if k not in folds_enabling_no_new_reactions}
-
-    def find_maximum_scope_folds(self):
-        for k,v in self.rules2rn.items():
-            pass
+    # def find_maximum_scope_folds(self):
+    #     for k,v in self.rules2rn.items():
+    #         pass
 
         ## 10/29/2022 I think we want to find a restricted rules2rn mapping that gets rid of reactions unobtainable 
         ##            from the current scope--because unless you're randomly injecting compounds down the road, those folds
         ##            won't actually ever be able to realize those extra reactions
-        ## Then, when we do all the narrowing-down in find_folds_enabling_new_reactions, we don't want to compare to all_folds
+        ## Then, when we do all the narrowing-down in filter_next_iter_to_folds_enabling_new_reactions, we don't want to compare to all_folds
         ##            and rules2rn, we want to compare to the scope-restricted versions of those things.
     
     def prepare_for_expansion(self):
-        folds_to_expand = self.find_superset_folds(self.find_folds_enabling_new_reactions())
+
+        ## Need to run these two calls every iteration of the fold expansion
+        future_fold2rns = self.filter_next_iter_to_folds_enabling_new_reactions(self.current_folds)
+        filtered_folds_to_expand = self.filter_next_iter_to_foldsupersets(future_fold2rns)
+        print("Folds whose rules correspond to reactions which are subsets of one another in the next NEXT ITERATION removed\n%i folds available for the NEXT ITERATION",len(filtered_folds_to_expand))
+
+    def expand(self,foldSet,seedSet,foldIndpendentReactions,algorithm='naive'):
+        self.current_folds = copy.deepcopy(foldSet)
+        fold_order = {'iteration': [], 'fold': []}
+
+        # define all the remaining folds
+        # folds_remain = set([f for f in folds if f not in fold_set])
+        iteration = 0;
+
+        # find out all the initially feasible reactions
+        foldEnabledReactions = fold_rules.folds2reactions(fold_set)
+        rxn_set = foldEnabledReactions + foldIndpendentReactions
+
+        # convert to reaction list to list of tuples with directions
+        rxn_set = set(metabolism.rxns2tuple(rxn_set))
+
+        # define the initial reaction set that is feasible
+        cpds_iteration = {'cid': list(seed_set), 'iteration' : [iteration for x in seed_set]}
+        rxns_iteration = {'rn': list(rxn_set) , 'iteration' : [iteration for x in rxn_set]}
+        condition = True
+        cpd_set = seed_set
+
+        # perform network expansion using the restricted set of folds
+        c,re,rf = fold_expansion(metabolism,fold_rules,fold_set_i,cpd_set,rxn_set)
+
+        # define the list of new reactions that are utilized after the expansion
+        rn_new = re
+        # update the reaction scope
+        rxn_set = rxn_set.union(set(rn_new))
+        # update the compound scope
+        cpd_set = cpd_set + c
 
 
 def example_main():
@@ -255,7 +335,11 @@ def example_main():
 
     ## Inititalize fold metabolism
     fm = FoldMetabolism(metabolism, rn2rules)
-    fm.seed_folds = 
+    fm.seed_cpds = set((pd.read_csv("data/josh/seed_set.csv")["ID"]))
+    fm.fold_independent_rns = set()
+    fm.seed_folds = set(['spontaneous'])
+
+    fm.expand(foldSet, seedSet, foldIndpendentReactions)
 
 
 
