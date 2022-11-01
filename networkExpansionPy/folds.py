@@ -125,7 +125,8 @@ class FoldMetabolism:
         self.scope_rules2rn = None
         self.scope_rn2rules = None
 
-        self.current_folds = None
+        self.current_folds = None ## Maybe want to get rid of this
+        self.current_cpds = None
 
         # calculate_scope(cpds_set)
 
@@ -161,7 +162,7 @@ class FoldMetabolism:
             self.scope_rn2rules = {k:v for k,v in self._f.rn2rules if k in self.scope_rns}
             self.scope_rules2rn = create_foldrules2rn(self.scope_rn2rules)
             self.scope_folds = set([i for fs in self.scope_rules2rn.keys() for i in fs])
-            print("Folds in RUN reduced to overlap with scope\n%i folds available in RUN",len(folds))
+            print("Folds in RUN reduced to overlap with scope from fold reactions and fold independent reactions\n%i folds available in RUN",len(folds)) ## scope only includes reactions in folds, and reacitons explicitly input as independent of folds
 
         else:
             pass 
@@ -179,6 +180,8 @@ class FoldMetabolism:
     #             rules2rn[k] = v_intersect
         
     #     return rules2rn
+    def folds2rules(self, folds, rules):
+        return {k:v for k,v in rules.items() if k <= rules}
             
     def create_foldrules2rn(self, rn2fold):
         fold2rn = dict()
@@ -283,44 +286,127 @@ class FoldMetabolism:
         ## Then, when we do all the narrowing-down in filter_next_iter_to_folds_enabling_new_reactions, we don't want to compare to all_folds
         ##            and rules2rn, we want to compare to the scope-restricted versions of those things.
     
-    def prepare_for_expansion(self):
+    def next_iter_possible_folds(self, current_folds):
 
         ## Need to run these two calls every iteration of the fold expansion
-        future_fold2rns = self.filter_next_iter_to_folds_enabling_new_reactions(self.current_folds)
+        future_fold2rns = self.filter_next_iter_to_folds_enabling_new_reactions(current_folds)
         filtered_folds_to_expand = self.filter_next_iter_to_foldsupersets(future_fold2rns)
         print("Folds whose rules correspond to reactions which are subsets of one another in the next NEXT ITERATION removed\n%i folds available for the NEXT ITERATION",len(filtered_folds_to_expand))
+        return filtered_folds_to_expand
 
-    def expand(self,foldSet,seedSet,foldIndpendentReactions,algorithm='naive'):
-        self.current_folds = copy.deepcopy(foldSet)
-        fold_order = {'iteration': [], 'fold': []}
+    # def folds2rns(self):
+    #     """
+    #     Get list of reactions possible with current folds (fold independent reactions not included)
+    #     """
+    #     return set([v for k,v in self.scope_rules2rn.items() if k in self.current_folds])
 
-        # define all the remaining folds
-        # folds_remain = set([f for f in folds if f not in fold_set])
-        iteration = 0;
+    # def fold_expansion(self):
+    #     current_rns = (self.folds2rn() | self._f.fold_independent_rns)
+    #     rxn_set = set(self._m.rxns2tuple(current_rns))
+    #     cx,rx = metabolism.expand(self.current_cpds,reaction_mask=rxn_set)
+    #     return cx, rx, current_rns
 
-        # find out all the initially feasible reactions
-        foldEnabledReactions = fold_rules.folds2reactions(fold_set)
-        rxn_set = foldEnabledReactions + foldIndpendentReactions
+    def fold_expand(self, metabolism, folds, rules2rn, cpds):
+        """Doesn't use self"""
+        rn_tup_set = set(metabolism.rxns2tuple(set(rules2rns.values())))
+        cx,rx = metabolism.expand(cpds,reaction_mask=rn_tup_set)
+        return cx, rx
 
-        # convert to reaction list to list of tuples with directions
-        rxn_set = set(metabolism.rxns2tuple(rxn_set))
 
-        # define the initial reaction set that is feasible
-        cpds_iteration = {'cid': list(seed_set), 'iteration' : [iteration for x in seed_set]}
-        rxns_iteration = {'rn': list(rxn_set) , 'iteration' : [iteration for x in rxn_set]}
-        condition = True
-        cpd_set = seed_set
+    def effect_per_fold(self, fold, current_folds, current_cpds):
+        """
+        I think this needs to be modified since i don't have self.current_compounds right now
 
-        # perform network expansion using the restricted set of folds
-        c,re,rf = fold_expansion(metabolism,fold_rules,fold_set_i,cpd_set,rxn_set)
+        self.folds2rules
+        self.scope_rules2rn
+        self._m
+        """
 
-        # define the list of new reactions that are utilized after the expansion
-        rn_new = re
-        # update the reaction scope
-        rxn_set = rxn_set.union(set(rn_new))
-        # update the compound scope
-        cpd_set = cpd_set + c
+        potential_fold_set = (current_folds | set([fold]))
+        potential_rules2rn = self.folds2rules(potential_fold_set, self.scope_rules2rn)
+        cx,rx = fold_expand(self._m, potential_fold_set, potential_rules2rn, current_cpds)
 
+        return potential_rules2rn, set(cx), set(rx)
+
+        # old_rules_enabled = self.folds2rules(self.current_folds, self.scope_rules2rn)
+        # new_rules_enabled = set(potential_rules2rn.keys()) - set(old_rules_enabled.keys())
+        # new_rns_enabled = set(rx) - set([i for s in old_rules_enabled.values() for i in s])
+        # new_cpds_enabled = set(cx) - self.current_cpds
+
+        # return new_rules_enabled, new_rns_enabled, new_cpds_enabled
+
+    def loop_through_folds(self, remaining_folds, current_folds, current_cpds):
+        """
+        Doesn't use self
+        """
+        next_iter_possible_folds = next_iter_possible_folds(remaining_folds)
+        f_effects = dict()
+        for f in next_iter_possible_folds:
+            _fdict = dict()
+            _fdict["rules2rn"], _fdict["cpds"], _fdict["rns"] = effect_per_fold(f, current_folds, current_cpds)
+            f_effects[f] = _fdict
+        return f_effects
+
+    # define a function that retuns the fold that leads to the largest number of reactions
+    # def maxFold(fdict):
+    #     q = {fold: len(j) for fold,j in fdict.items()}
+    #     q = pd.Series(q)
+    #     return q[q == q.max()].index.tolist()
+
+    def maxreactions(self, f_effects):
+        k_vcount = {k:len(v["rns"]) for k,v in f_effects.items()}
+        return max(k_vcount, key = k_vcount.get)
+
+    def select_next_fold(self, remaining_folds, current_folds, current_cpds, fselect_func=maxreactions):
+        f_effects = loop_through_folds(remaining_folds, current_folds, current_cpds)
+        next_fold = fselect_func(f_effects)
+        return next_fold, f_effects[next_fold]
+
+    ## Need to make sure I run the expansion once without folds first
+    ## Need to make sure that the initial "current_folds" includes the seed_folds. 
+    ## Can i just store current_folds in my same current dict?
+
+    # def update_current(self, next_fold, fdata, current):
+
+    #     ## Update folds
+    #     self.current_folds = (self.current_folds | set([next_fold]))
+        
+    #     ## Update cpds, rns, rules2rn
+    #     current["cpds"] = (fdata["cpds"] | current["cpds"]) 
+    #     current["rns"] = (fdata["rns"] | current["rns"]) ## I only need to track these to see what iteration they appeared
+    #     current["rules2rn"] = self.folds2rules(self.current_folds, self.scope_rules2rn)
+
+    #     return current
+
+
+    def fold_order(self):
+        
+        ## Initial current values
+        current = dict() ## current cpds, rns, rules2rn, folds
+        current["folds"] = copy.deepcopy(self.seed_folds)
+        current["cpds"] = copy.deepcopy(self.seed_cpds)
+        current["rules2rn"] = self.folds2rules(current["folds"], self.scope_rules2rn)
+        current["rns"] = (self._f.fold_independent_rns | set([i for s in rules2rn_0.values() for i in s]))  ## As written, these are the reactions allowed by the folds, NOT the reactions utilized by the available compounds
+        
+        ## Iteration data
+        keepgoing = True 
+        iteration = 0
+        iteration_dict = dict()
+        iteration_dict["cpds"] = {i:iteration for i in current["cpds"]}
+        iteration_dict["rns"] = {i:iteration for i in current["rns"]}
+        remaining_folds = (self.scope_folds - current["folds"])
+        while keepgoing:
+            next_fold, fdata = select_next_fold(remaining_folds, current["folds"], current["cpds"])
+            
+            ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
+            current["folds"] = (current["folds"] | set([next_fold]))
+            current["cpds"] = copy.deepcopy(fdata["cpds"])
+            current["rules2rn"] = copy.deepcopy(fdata["rules2rn"])
+            current["rns"] = copy.deepcopy(fdata["rns"])
+            
+            ## Store when cpds and rns appear in the expansion
+            iteration_dict["cpds"] = {i:iteration for i in current["cpds"] if i not in iteration_dict["cpds"]}
+            iteration_dict["rns"] = {i:iteration for i in current["rns"] if i not in iteration_dict["rns"]}
 
 def example_main():
     ## Load metabolism
