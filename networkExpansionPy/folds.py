@@ -82,6 +82,16 @@ class FoldRules:
         folds_remove_list = list(folds_remove)
         self.folds = [x for x in self.folds if x not in folds_remove_list]
 
+#function that peforms fold expansion
+def fold_expansion(metabolism,foldRules,fold_set,cpds_set,rxns_seed):
+    rn_list = foldRules.folds2reactions(fold_set)
+    rn_list = metabolism.rxns2tuple(rn_list) + list(rxns_seed)
+    cx,rx = metabolism.expand(cpds_set,reaction_mask=rn_list)
+    return cx,rx,rn_list
+
+########################################################################################################################
+########################################################################################################################
+
 class GlobalFoldNetwork:
 
     def __init__(self, rn2rules, fold_independent_rns):
@@ -377,67 +387,3 @@ def example_main():
     fm.seed_folds = set(['spontaneous'])
 
     fm.expand(foldSet, seedSet, foldIndpendentReactions)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    ## Define fold rules
-    # fold_rules = nf.FoldRules()
-    # ecode2rn_path = PurePath("ecode","ecod2rn.keggHMM.17July2021.csv")
-    # fold_rules.setRules(path=ecode2rn_path)
-    # folds = [list(x) for x in fold_rules.rules.fold_sets.tolist()]
-    # folds = [item for sublist in folds for item in sublist]
-
-    # seed_set = list(pd.read_csv("data/josh/seed_set.csv")["ID"])
-
-    # print('starting optimal path finding...')
-
-    # # initialize the algorithm, create a list of folds that remain to be selected during expansion
-    # # define folds and reactions that are always available (fold Naive reactions)
-
-    # # define the set of reactions and folds that are accessible initially
-    # foldIndpendentReactions = []
-    # fold_set = set(['spontaneous']);
-    # fold_set_i = set(['spontaneous'])
-    # fold_order = {'iteration': [], 'fold': []}
-    # # define all the remaining folds
-    # folds_remain = set([f for f in folds if f not in fold_set])
-    # iteration = 0;
-
-    # # find out all the initially feasible reactions
-    # foldEnabledReactions = fold_rules.folds2reactions(fold_set)
-    # rxn_set = foldEnabledReactions + foldIndpendentReactions
-
-    # # convert to reaction list to list of tuples with directions
-    # rxn_set = set(metabolism.rxns2tuple(rxn_set))
-
-    # # define the initial reaction set that is feasible
-    # cpds_iteration = {'cid': list(seed_set), 'iteration' : [iteration for x in seed_set]}
-    # rxns_iteration = {'rn': list(rxn_set) , 'iteration' : [iteration for x in rxn_set]}
-    # condition = True
-    # cpd_set = seed_set
-
-    # # perform network expansion using the restricted set of folds
-    # c,re,rf = fold_expansion(metabolism,fold_rules,fold_set_i,cpd_set,rxn_set)
-
-
-    # foldmetabolism = FoldMetabolism()
-
-#function that peforms fold expansion
-def fold_expansion(metabolism,foldRules,fold_set,cpds_set,rxns_seed):
-    rn_list = foldRules.folds2reactions(fold_set)
-    rn_list = metabolism.rxns2tuple(rn_list) + list(rxns_seed)
-    cx,rx = metabolism.expand(cpds_set,reaction_mask=rn_list)
-    return cx,rx,rn_list
