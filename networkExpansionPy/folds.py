@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from pathlib import PurePath, Path
 from copy import copy, deepcopy
+import timeit
 
 asset_path = PurePath(__file__).parent / "assets"
 
@@ -245,7 +246,7 @@ class FoldMetabolism:
         current_fold2rn = {k:v for k,v in self.scope_rules2rn.items() if k <= current_folds}
         current_rns = set([rn for v in current_fold2rn.values() for rn in v])
         folds_enabling_no_new_reactions = set([k for k,v in future_fold2rns.items() if v==current_rns])
-        print("Folds enabling no new reactions during the next NEXT ITERATION removed\n%i folds available for the NEXT ITERATION"%len(current_folds - folds_enabling_no_new_reactions))
+        print("-> Folds enabling no new reactions during the next NEXT ITERATION removed\n-> ... %i folds available for the NEXT ITERATION"%len(set(future_fold2rns.keys()) - folds_enabling_no_new_reactions))
 
         ## need to ouput if a fold doesn't do anything either--that is, by its addition to the existing foldset, it won't be able to enable any new reactions
         return {k:v for k,v in future_fold2rns.items() if k not in folds_enabling_no_new_reactions}
@@ -285,7 +286,7 @@ class FoldMetabolism:
         ## Need to run these two calls every iteration of the fold expansion
         future_fold2rns = self.filter_next_iter_to_folds_enabling_new_reactions(current_folds)
         filtered_folds_to_expand = self.filter_next_iter_to_foldsupersets(future_fold2rns)
-        print("Folds whose rules correspond to reactions which are subsets of one another in the next NEXT ITERATION removed\n%i folds available for the NEXT ITERATION"%len(filtered_folds_to_expand))
+        print("-> Folds whose rules correspond to reactions which are subsets of one another in the next NEXT ITERATION removed\n-> ... %i folds available for the NEXT ITERATION"%len(filtered_folds_to_expand))
         return filtered_folds_to_expand
 
     def fold_expand(self, metabolism, folds, rules2rn, cpds):
@@ -310,11 +311,11 @@ class FoldMetabolism:
 
         return potential_rules2rn, set(cx), set(rx)
 
-    def loop_through_folds(self, remaining_folds, current_folds, current_cpds):
+    def loop_through_folds(self, current_folds, current_cpds):
         """
         Doesn't use self
         """
-        next_iter_possible_folds = self.next_iter_possible_folds(remaining_folds)
+        next_iter_possible_folds = self.next_iter_possible_folds(current_folds)
         f_effects = dict()
         for f in next_iter_possible_folds:
             _fdict = dict()
@@ -326,8 +327,8 @@ class FoldMetabolism:
         k_vcount = {k:len(v["rns"]) for k,v in f_effects.items()}
         return max(k_vcount, key = k_vcount.get)
 
-    def select_next_fold(self, remaining_folds, current_folds, current_cpds, fselect_func=maxreactions):
-        f_effects = self.loop_through_folds(remaining_folds, current_folds, current_cpds)
+    def select_next_fold(self, current_folds, current_cpds, fselect_func=maxreactions):
+        f_effects = self.loop_through_folds(current_folds, current_cpds)
         next_fold = fselect_func(f_effects)
         return next_fold, f_effects[next_fold]
 
@@ -366,10 +367,15 @@ class FoldMetabolism:
 
 
         while keepgoing:
+            start = timeit.default_timer()
             print("\nITERATION: ", iteration)
-            print("folds remaining: ", len(remaining_folds))
+            print("maximum n folds remaining: ", len(remaining_folds))
+            print("maximum remaining_folds:\n", remaining_folds)
             iteration += 1
-            next_fold, fdata = self.select_next_fold(remaining_folds, current["folds"], current["cpds"])
+            next_fold, fdata = self.select_next_fold(current["folds"], current["cpds"])
+            print("next fold: ", next_fold)
+            exec_time = timeit.default_timer() - start
+            print("iteration runtime: ", exec_time)
             remaining_folds = (remaining_folds - set([next_fold]))
 
             ## Stop conditions
