@@ -180,7 +180,7 @@ class FoldMetabolism:
         return set(scope_cpds), set([i[0] for i in scope_rns])
 
     def folds2rules(self, folds, rules):
-        return {k:v for k,v in rules.items() if k <= set(rules)}
+        return {k:v for k,v in rules.items() if k <= set(folds)}
             
     def create_foldrules2rn(self, rn2fold):
         fold2rn = dict()
@@ -291,22 +291,22 @@ class FoldMetabolism:
 
     def fold_expand(self, metabolism, folds, rules2rn, cpds):
         """Doesn't use self"""
-        rn_tup_set = set(metabolism.rxns2tuple(set(rules2rn.values())))
+        rn_tup_set = set(metabolism.rxns2tuple(set([i for s in rules2rn.values() for i in s])))
         cx,rx = metabolism.expand(cpds,reaction_mask=rn_tup_set)
         return cx, set([i[0] for i in rx])
 
 
     def effect_per_fold(self, fold, current_folds, current_cpds):
         """
-        I think this needs to be modified since i don't have self.current_compounds right now
-
         self.folds2rules
         self.scope_rules2rn
         self._m
         """
 
         potential_fold_set = (current_folds | set([fold]))
+        print(f"{potential_fold_set=}")
         potential_rules2rn = self.folds2rules(potential_fold_set, self.scope_rules2rn)
+        print(f"{potential_rules2rn=}")
         cx,rx = self.fold_expand(self._m, potential_fold_set, potential_rules2rn, current_cpds)
 
         return potential_rules2rn, set(cx), set(rx)
@@ -329,6 +329,7 @@ class FoldMetabolism:
 
     def select_next_fold(self, current_folds, current_cpds, fselect_func=maxreactions):
         f_effects = self.loop_through_folds(current_folds, current_cpds)
+        print("feffects: ", f_effects)
         next_fold = fselect_func(f_effects)
         return next_fold, f_effects[next_fold]
 
