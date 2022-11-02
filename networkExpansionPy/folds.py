@@ -335,24 +335,27 @@ class FoldMetabolism:
     def fold_order(self):
         
         ## Initialize current values
-        current = dict() ## current cpds, rns, rules2rn, folds
-        current["folds"] = deepcopy(self.seed_folds)
-        current["cpds"] = deepcopy(self.seed_cpds)
-        current["rns"] = set([])
+        current = {
+            "folds": deepcopy(self.seed_folds),
+            "cpds": deepcopy(self.seed_cpds),
+            "rns":set([])
+            }
         
         ## Initialize iteration data
         keepgoing = True 
         iteration = 0
-        iteration_dict = {"cpds":dict(), "rns":dict(), "folds":dict()}
+        iteration_dict = {
+            "cpds":dict(), 
+            "rns":dict(), 
+            "folds":dict()
+            }
         iteration_dict = self.update_iteration_dict(iteration_dict, current, iteration)
         remaining_folds = (self.scope_folds - current["folds"])
+        iteration+=1
 
         ## First expansion (using only seed folds)
         init_rules2rn = self.folds2rules(current["folds"], self.scope_rules2rn)
-        cpds, rns = self.fold_expand(self._m, current["folds"], init_rules2rn, current["cpds"])
-        current["cpds"] = deepcopy(cpds)
-        current["rns"] = deepcopy(rns)
-        iteration+=1
+        current["cpds"], current["rns"] = self.fold_expand(self._m, current["folds"], init_rules2rn, current["cpds"])
         iteration_dict = self.update_iteration_dict(iteration_dict, current, iteration)
 
         while keepgoing:
@@ -377,8 +380,8 @@ class FoldMetabolism:
             
             ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
             current["folds"] = (current["folds"] | set([next_fold]))
-            current["cpds"] = deepcopy(fdata["cpds"])
-            current["rns"] = deepcopy(fdata["rns"])
+            current["cpds"] = fdata["cpds"]
+            current["rns"] = fdata["rns"]
             
             ## Store when cpds and rns appear in the expansion
             iteration_dict = self.update_iteration_dict(iteration_dict, current, iteration)
