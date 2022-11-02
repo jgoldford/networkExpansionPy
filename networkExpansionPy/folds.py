@@ -350,9 +350,10 @@ class FoldMetabolism:
         iteration_dict = {
             "cpds":dict(), 
             "rns":dict(), 
-            "folds":dict()
+            "folds":{"fold_independent":0}
             }
-        iteration_dict = self.update_iteration_dict(iteration_dict, current, iteration)
+        ## Avoid updating folds on the 0th iteration since they don't apply until iteration=1
+        iteration_dict = self.update_iteration_dict(iteration_dict, {k:v for k,v in current.items() if k!="folds"}, iteration)
         remaining_folds = (self.scope_folds - current["folds"])
         iteration+=1
 
