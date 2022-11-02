@@ -4,6 +4,7 @@ import pandas as pd
 from pathlib import PurePath, Path
 from copy import copy, deepcopy
 import timeit
+from pprint import pprint
 
 asset_path = PurePath(__file__).parent / "assets"
 
@@ -304,9 +305,9 @@ class FoldMetabolism:
         """
 
         potential_fold_set = (current_folds | set([fold]))
-        print(f"{potential_fold_set=}")
+        # print(f"{potential_fold_set=}")
         potential_rules2rn = self.folds2rules(potential_fold_set, self.scope_rules2rn)
-        print(f"{potential_rules2rn=}")
+        # print(f"{potential_rules2rn=}")
         cx,rx = self.fold_expand(self._m, potential_fold_set, potential_rules2rn, current_cpds)
 
         return potential_rules2rn, set(cx), set(rx)
@@ -329,7 +330,8 @@ class FoldMetabolism:
 
     def select_next_fold(self, current_folds, current_cpds, fselect_func=maxreactions):
         f_effects = self.loop_through_folds(current_folds, current_cpds)
-        print("feffects: ", f_effects)
+        # print("feffects:")
+        # pprint(f_effects)
         next_fold = fselect_func(f_effects)
         return next_fold, f_effects[next_fold]
 
@@ -337,34 +339,39 @@ class FoldMetabolism:
     ## Need to make sure that the initial "current_folds" includes the seed_folds. 
     ## Can i just store current_folds in my same current dict?
 
+    def update_iteration_dict(self, iteration_dict, current, iteration):
+        for dtype, ids in current.items():
+            for i in ids:
+                if i not in iteration_dict[dtype]:
+                    iteration_dict[dtype][i] = iteration
+        return iteration_dict
+
+
     def fold_order(self):
         
         ## Initial current values
         current = dict() ## current cpds, rns, rules2rn, folds
         current["folds"] = deepcopy(self.seed_folds)
         current["cpds"] = deepcopy(self.seed_cpds)
-        current["rules2rn"] = self.folds2rules(current["folds"], self.scope_rules2rn)
         current["rns"] = set([])
         # current["rns"] = (self._f.fold_independent_rns | set([i for s in current["rules2rn"].values() for i in s]))  ## As written, these are the reactions allowed by the folds, NOT the reactions utilized by the available compounds
         
         ## Iteration data
         keepgoing = True 
         iteration = 0
-        iteration_dict = dict()
-        iteration_dict["cpds"] = {i:iteration for i in current["cpds"]}
-        iteration_dict["rns"] = {i:iteration for i in current["rns"]}
-        iteration_dict["folds"] = {i:iteration for i in current["folds"]}
+        iteration_dict = {"cpds":dict(), "rns":dict(), "folds":dict()}
+        iteration_dict = self.update_iteration_dict(iteration_dict, current, iteration)
         remaining_folds = (self.scope_folds - current["folds"])
 
         ## First expansion (using only seed folds)
-        cpds, rns = self.fold_expand(self._m, current["folds"], current["rules2rn"], current["cpds"])
+        init_rules2rn = self.folds2rules(current["folds"], self.scope_rules2rn)
+        cpds, rns = self.fold_expand(self._m, current["folds"], init_rules2rn, current["cpds"])
         ## Update cpds, rns; folds, rules2rns dont' change
         current["cpds"] = deepcopy(cpds)
         current["rns"] = deepcopy(rns)
 
         iteration+=1
-        iteration_dict["cpds"] = {i:iteration for i in current["cpds"] if i not in iteration_dict["cpds"]}
-        iteration_dict["rns"] = {i:iteration for i in current["rns"] if i not in iteration_dict["rns"]}
+        iteration_dict = self.update_iteration_dict(iteration_dict, current, iteration)
 
 
         while keepgoing:
@@ -375,6 +382,8 @@ class FoldMetabolism:
             iteration += 1
             next_fold, fdata = self.select_next_fold(current["folds"], current["cpds"])
             print("next fold: ", next_fold)
+            print("fdata:")
+            pprint(fdata)
             exec_time = timeit.default_timer() - start
             print("iteration runtime: ", exec_time)
             remaining_folds = (remaining_folds - set([next_fold]))
@@ -388,13 +397,14 @@ class FoldMetabolism:
             ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
             current["folds"] = (current["folds"] | set([next_fold]))
             current["cpds"] = deepcopy(fdata["cpds"])
-            current["rules2rn"] = deepcopy(fdata["rules2rn"])
+            # current["rules2rn"] = deepcopy(fdata["rules2rn"])
             current["rns"] = deepcopy(fdata["rns"])
             
             ## Store when cpds and rns appear in the expansion
-            iteration_dict["cpds"] = {i:iteration for i in current["cpds"] if i not in iteration_dict["cpds"]}
-            iteration_dict["rns"] = {i:iteration for i in current["rns"] if i not in iteration_dict["rns"]}
-            iteration_dict["folds"][next_fold] = iteration
+            # iteration_dict["cpds"] = {i:iteration for i in current["cpds"] if i not in iteration_dict["cpds"]}
+            # iteration_dict["rns"] = {i:iteration for i in current["rns"] if i not in iteration_dict["rns"]}
+            # iteration_dict["folds"][next_fold] = iteration
+            iteration_dict = self.update_iteration_dict(iteration_dict, current, iteration)
 
         return current, iteration_dict
             
