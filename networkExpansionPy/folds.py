@@ -333,6 +333,9 @@ class FoldMetabolism:
         return iteration_dict
 
     def fold_order(self):
+
+        if (self.seed_cpds == None) or (self.seed_folds == None):
+            raise ValueError("self.seed_cpds and self.seed_folds must not be None")
         
         ## Initialize current values
         current = {
