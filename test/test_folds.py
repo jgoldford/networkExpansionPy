@@ -1,0 +1,113 @@
+import unittest
+import networkExpansionPy.lib as ne
+import pandas as pd
+from scipy.sparse import csr_matrix
+# from pandas.testing import assert_frame_equal
+
+class TestGlobalFoldNetworkInit(unittest.TestCase):
+
+    def setUp(self):
+        reactions = 10
+        compounds = 11
+        rids = ['R' + str(x) for x in range(reactions)]
+        cids = ['C' + str(x) for x in range(compounds)]
+        folds = ['F' + str(x) for x in range(reactions)]
+        network = {'rn':[],'direction':[],'cid':[],'s':[]}
+        fold_rules  = {'rn': [],'rule':[]}
+        i = 0
+        for r in rids:
+            network['rn'].append(r)
+            network['direction'].append('forward')
+            network['cid'].append(cids[i])    
+            network['s'].append(-1)
+            
+            network['rn'].append(r)
+            network['direction'].append('forward')
+            network['cid'].append(cids[i+1])    
+            network['s'].append(1)
+            fold_rules['rn'].append(r)
+            fold_rules['rule'].append(folds[i])
+            
+            i = i +1
+
+        self.network = pd.DataFrame(network)
+        self.fold_rules = pd.DataFrame(fold_rules)
+        self.fold_rules['fold_sets'] = self.fold_rules.rule.apply(lambda x: set(x.split('_')))
+        self.rn2rules = {d["rn"]:{frozenset(d["fold_sets"])} for d in self.fold_rules.to_dict(orient="records")}
+
+        ## Create Metabolism
+        self.met = ne.GlobalMetabolicNetwork(metabolism="dev")
+        self.met.network = self.network
+
+    def test_GlobalFoldNetwork_create_foldrules2rn(self):
+        fold_independent_rns = set()
+        foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
+        expected_rules2rn = {frozenset({'F0'}): {'R0'},
+                        frozenset({'F1'}): {'R1'},
+                        frozenset({'F2'}): {'R2'},
+                        frozenset({'F3'}): {'R3'},
+                        frozenset({'F4'}): {'R4'},
+                        frozenset({'F5'}): {'R5'},
+                        frozenset({'F6'}): {'R6'},
+                        frozenset({'F7'}): {'R7'},
+                        frozenset({'F8'}): {'R8'},
+                        frozenset({'F9'}): {'R9'}}
+        self.assertEqual(foldnet.rules2rn, expected_rules2rn)
+
+    def test_FoldMetabolism_fold_order_C0_no_indepdendent(self):
+        fold_independent_rns = set()
+        foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
+        fm = nf.FoldMetabolism(toymet, toyfoldnet)
+        fm.seed_cpds = set(['C0'])
+        fm.seed_folds = set([])
+        current, iteration_dict = fm.fold_order()
+
+        expected_current = {'folds': {'F0', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'},
+                            'cpds': {'C0', 'C1', 'C10', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9'},
+                            'rns': {'R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9'}}
+
+        expected_iteration_dict = {'cpds': {'C0': 0,
+                                'C1': 2,
+                                'C2': 3,
+                                'C3': 4,
+                                'C4': 5,
+                                'C5': 6,
+                                'C6': 7,
+                                'C7': 8,
+                                'C8': 9,
+                                'C9': 10,
+                                'C10': 11},
+                                'rns': {'R0': 2,
+                                'R1': 3,
+                                'R2': 4,
+                                'R3': 5,
+                                'R4': 6,
+                                'R5': 7,
+                                'R6': 8,
+                                'R7': 9,
+                                'R8': 10,
+                                'R9': 11},
+                                'folds': {'F0': 2,
+                                'F1': 3,
+                                'F2': 4,
+                                'F3': 5,
+                                'F4': 6,
+                                'F5': 7,
+                                'F6': 8,
+                                'F7': 9,
+                                'F8': 10,
+                                'F9': 11}}
+
+        self.assertEqual(iteration_dict, expected_iteration_dict)
+        self.assertEqual(current, expected_current)
+        
+    def test_FoldMetabolism_fold_order_C0_independent(self):
+        pass
+
+    def test_FoldMetabolism_fold_order_C5_no_independent(self):
+        pass
+
+
+# class TestFoldMetabolismInit(unittest.TestCase):
+
+#     def test
