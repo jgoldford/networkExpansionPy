@@ -1,5 +1,6 @@
 import unittest
 import networkExpansionPy.lib as ne
+import networkExpansionPy.folds as nf
 import pandas as pd
 from scipy.sparse import csr_matrix
 # from pandas.testing import assert_frame_equal
@@ -57,7 +58,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
     def test_FoldMetabolism_fold_order_C0_no_indepdendent(self):
         fold_independent_rns = set()
         foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
-        fm = nf.FoldMetabolism(toymet, toyfoldnet)
+        fm = nf.FoldMetabolism(self.met, foldnet)
         fm.seed_cpds = set(['C0'])
         fm.seed_folds = set([])
 
@@ -129,7 +130,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
     def test_FoldMetabolism_fold_order_C0_independent_R0R1(self):
         fold_independent_rns = set(["R0","R1"])
         foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
-        fm = nf.FoldMetabolism(toymet, toyfoldnet)
+        fm = nf.FoldMetabolism(self.met, foldnet)
         fm.seed_cpds = set(['C0'])
         fm.seed_folds = set([])
 
@@ -198,7 +199,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
     def test_FoldMetabolism_fold_order_C0_independent_R3R5(self):
         fold_independent_rns = set(["R3","R5"])
         foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
-        fm = nf.FoldMetabolism(toymet, toyfoldnet)
+        fm = nf.FoldMetabolism(self.met, foldnet)
         fm.seed_cpds = set(['C0'])
         fm.seed_folds = set([])
 
@@ -265,9 +266,9 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                                 'F9': 11}}
 
     def test_FoldMetabolism_fold_order_C5_no_independent(self):
-        pafold_independent_rns = set()
+        fold_independent_rns = set()
         foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
-        fm = nf.FoldMetabolism(toymet, toyfoldnet)
+        fm = nf.FoldMetabolism(self.met, foldnet)
         fm.seed_cpds = set(['C5'])
         fm.seed_folds = set([])
 
@@ -290,7 +291,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                             'cpds': {'C10', 'C5', 'C6', 'C7', 'C8', 'C9'},
                             'rns': {'R5', 'R6', 'R7', 'R8', 'R9'}}
 
-        expected_iteration = {'cpds': {'C5': 0, 'C6': 2, 'C7': 3, 'C8': 4, 'C9': 5, 'C10': 6},
+        expected_iteration_dict = {'cpds': {'C5': 0, 'C6': 2, 'C7': 3, 'C8': 4, 'C9': 5, 'C10': 6},
                             'rns': {'R5': 2, 'R6': 3, 'R7': 4, 'R8': 5, 'R9': 6},
                             'folds': {'fold_independent': 0, 'F5': 2, 'F6': 3, 'F7': 4, 'F8': 5, 'F9': 6}}
         self.assertEqual(iteration_dict, expected_iteration_dict)
@@ -348,7 +349,7 @@ class TestGlobalFoldNetworkReversible(unittest.TestCase):
     def test_FoldMetabolism_fold_order_C0_reversible(self):
         fold_independent_rns = set()
         foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
-        fm = nf.FoldMetabolism(toymet, toyfoldnet)
+        fm = nf.FoldMetabolism(self.met, foldnet)
         fm.seed_cpds = set(['C0'])
         fm.seed_folds = set([])
 
@@ -420,7 +421,7 @@ class TestGlobalFoldNetworkReversible(unittest.TestCase):
     def test_FoldMetabolism_fold_order_C5_reversible(self):
         fold_independent_rns = set([])
         foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
-        fm = nf.FoldMetabolism(toymet, toyfoldnet)
+        fm = nf.FoldMetabolism(self.met, foldnet)
         fm.seed_cpds = set(['C5'])
         fm.seed_folds = set([])
 
@@ -486,6 +487,47 @@ class TestGlobalFoldNetworkReversible(unittest.TestCase):
                                 'F8': 10,
                                 'F9': 11}}
 
-# class TestFoldMetabolismInit(unittest.TestCase):
+class TestGlobalFoldNetworkTwoFoldsSimultaneouslyNeeded(unittest.TestCase):
 
-#     def test
+    def setUp(self):
+        reactions = 10
+        compounds = 11
+        rids = ['R' + str(x) for x in range(reactions)]
+        cids = ['C' + str(x) for x in range(compounds)]
+        folds = ['F' + str(x) for x in range(reactions)]
+        network = {'rn':[],'direction':[],'cid':[],'s':[]}
+        fold_rules  = {'rn': [],'rule':[]}
+        i = 0
+        for r in rids:
+            ## Forward i
+            network['rn'].append(r)
+            network['direction'].append('forward')
+            network['cid'].append(cids[i])    
+            network['s'].append(-1)
+
+            ## Forward i+1
+            network['rn'].append(r)
+            network['direction'].append('forward')
+            network['cid'].append(cids[i+1])    
+            network['s'].append(1)
+            fold_rules['rn'].append(r)
+            fold_rules['rule'].append(folds[i])
+            
+            i = i +1
+
+        self.network = pd.DataFrame(network)
+        self.fold_rules = pd.DataFrame(fold_rules)
+        self.fold_rules['fold_sets'] = self.fold_rules.rule.apply(lambda x: set(x.split('_')))
+        self.rn2rules = {d["rn"]:{frozenset(d["fold_sets"])} for d in self.fold_rules.to_dict(orient="records")}
+        self.rn2rules["R0"] = {frozenset({'F0','F10'})}
+
+        ## Create Metabolism
+        self.met = ne.GlobalMetabolicNetwork(metabolism="dev")
+        self.met.network = self.network
+
+    def test_FoldMetabolism_fold_order_R0_needs_2_folds(self):
+        fold_independent_rns = set([])
+        foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
+        fm = nf.FoldMetabolism(self.met, foldnet)
+        fm.seed_cpds = set(['C0'])
+        fm.seed_folds = set([])
