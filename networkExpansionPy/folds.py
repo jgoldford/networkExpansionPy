@@ -281,9 +281,10 @@ class FoldMetabolism:
         print("-> Folds whose rules correspond to reactions which are subsets of one another in the next NEXT ITERATION removed\n-> ... %i folds available for the NEXT ITERATION"%len(filtered_folds_to_expand))
         return filtered_folds_to_expand
 
-    def fold_expand(self, metabolism, folds, rules2rn, cpds):
+    def fold_expand(self, metabolism, folds, rules2rn, fold_independent_rns, cpds):
         """Doesn't use self"""
-        rn_tup_set = set(metabolism.rxns2tuple(set([i for s in rules2rn.values() for i in s])))
+        fold_rns = set([i for s in rules2rn.values() for i in s])
+        rn_tup_set = set(metabolism.rxns2tuple(fold_rns | fold_independent_rns))
         cx,rx = metabolism.expand(cpds,reaction_mask=rn_tup_set)
         return cx, set([i[0] for i in rx])
 
@@ -299,7 +300,7 @@ class FoldMetabolism:
         # print(f"{potential_fold_set=}")
         potential_rules2rn = self.folds2rules(potential_fold_set, self.scope_rules2rn)
         # print(f"{potential_rules2rn=}")
-        cx,rx = self.fold_expand(self._m, potential_fold_set, potential_rules2rn, current_cpds)
+        cx,rx = self.fold_expand(self._m, potential_fold_set, potential_rules2rn, self._f.fold_independent_rns, current_cpds)
 
         return potential_rules2rn, set(cx), set(rx)
 
@@ -357,9 +358,9 @@ class FoldMetabolism:
         remaining_folds = (self.scope_folds - current["folds"])
         iteration+=1
 
-        ## First expansion (using only seed folds)
+        ## First expansion (using only seed folds and fold independent reactions)
         init_rules2rn = self.folds2rules(current["folds"], self.scope_rules2rn)
-        current["cpds"], current["rns"] = self.fold_expand(self._m, current["folds"], init_rules2rn, current["cpds"])
+        current["cpds"], current["rns"] = self.fold_expand(self._m, current["folds"], init_rules2rn, self._f.fold_independent_rns, current["cpds"])
         iteration_dict = self.update_iteration_dict(iteration_dict, current, iteration)
 
         while keepgoing:
