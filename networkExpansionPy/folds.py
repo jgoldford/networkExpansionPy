@@ -316,6 +316,7 @@ class FoldMetabolism:
     def maxreactions(f_effects):
         """Doesn't use self"""
         k_vcount = {k:len(v["rns"]) for k,v in f_effects.items()}
+        k_vcount = dict(sorted(k_vcount.items())) ## Sort for reproduceability
         return max(k_vcount, key = k_vcount.get)
 
     def select_next_fold(self, current_folds, current_cpds, fselect_func=maxreactions):
