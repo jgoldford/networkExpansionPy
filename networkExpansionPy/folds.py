@@ -220,6 +220,33 @@ class FoldMetabolism:
         
         return fold2foldsubset, fold2foldstrictsubset, fold2equalfold
 
+    def filter_next_iter_to_foldsets_enabling_new_reactions(self, current_folds):
+
+        # for rule, rn in self.scope_rules2rn.item():
+        #     foldset = rule - current_folds
+        #     future_folds = current_folds | foldset
+        #     future_foldrules2rns = {k:v for k,v in self.scope_rules2rn.items() if k <= future_folds}
+        current_fold2rn = {k:v for k,v in self.scope_rules2rn.items() if k <= current_folds}
+        current_rns = set([rn for v in current_fold2rn.values() for rn in v])
+        # foldsets_enabling_no_new_reactions = set([k for k,v in self.scope_rules2rn.items() if v <= current_rns])
+        ## Think i can skip the above line, and just return:
+        return {k:v for k,v in self.scope_rules2rn.items() if not v <= current_rns}
+
+        # future_fold2rns = dict()
+        # for fold in self.scope_folds-current_folds:
+        #     future_folds = current_folds | set([fold])
+        #     future_foldrules2rns = {k:v for k,v in self.scope_rules2rn.items() if k <= future_folds}
+        #     future_rns = set([rn for v in future_foldrules2rns.values() for rn in v])
+        #     future_fold2rns[fold] = future_rns
+
+        # current_fold2rn = {k:v for k,v in self.scope_rules2rn.items() if k <= current_folds}
+        # current_rns = set([rn for v in current_fold2rn.values() for rn in v])
+        # folds_enabling_no_new_reactions = set([k for k,v in future_fold2rns.items() if v==current_rns])
+        # print("-> Folds enabling no new reactions during the next NEXT ITERATION removed\n-> ... %i folds available for the NEXT ITERATION"%len(set(future_fold2rns.keys()) - folds_enabling_no_new_reactions))
+
+        ## need to ouput if a fold doesn't do anything either--that is, by its addition to the existing foldset, it won't be able to enable any new reactions
+        # return {k:v for k,v in self.scope_rules2rn.items() if k not in foldsets_enabling_no_new_reactions}
+
     def filter_next_iter_to_folds_enabling_new_reactions(self, current_folds):
         """
         Create a mapping of fold:{rns}, where {rns} are the reactions enabled by adding the fold to the existing foldset.
@@ -391,8 +418,16 @@ class FoldMetabolism:
 
             ## Stop conditions
             if (fdata["cpds"] == current["cpds"]) and (fdata["rns"] == current["rns"]):
-                print("CPDS AND RNS NOT CHANGING!!")
-                keepgoing = False               
+                keepgoing = False    
+
+                ## If no reactions were added, try multiple folds simultaneously
+                multifold_rules2rn = remaining_multifold_rules()     
+                if len(multifold_rules2rn) > 0:
+                    ## Need to basically do the existing process to select fold, except selecting all folds of an entire rule (of length 2) instead of selecting just 1 fold
+                    ##      Always take smallest number of folds which provide any new reactions/compounds. It might also be the case that after adding a double fold, single folds again
+                    ##      become viable.
+                    next_fold, fdata = self.select_next_fold(current["folds"], current["cpds"])
+
             else:
                 ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
                 current["folds"] = (current["folds"] | set([next_fold]))
@@ -401,8 +436,6 @@ class FoldMetabolism:
                 
                 ## Store when cpds and rns appear in the expansion
                 iteration_dict = self.update_iteration_dict(iteration_dict, current, iteration)
-
-                
 
         return current, iteration_dict
             

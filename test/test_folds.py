@@ -531,3 +531,6 @@ class TestGlobalFoldNetworkTwoFoldsSimultaneouslyNeeded(unittest.TestCase):
         fm = nf.FoldMetabolism(self.met, foldnet)
         fm.seed_cpds = set(['C0'])
         fm.seed_folds = set([])
+
+    def test_exit_at_correct_iteration_1(self):
+        pass
