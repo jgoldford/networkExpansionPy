@@ -286,7 +286,7 @@ class FoldMetabolism:
         fold_rns = set([i for s in rules2rn.values() for i in s])
         rn_tup_set = set(metabolism.rxns2tuple(fold_rns | fold_independent_rns))
         cx,rx = metabolism.expand(cpds,reaction_mask=rn_tup_set)
-        return cx, set([i[0] for i in rx])
+        return set(cx), set([i[0] for i in rx])
 
 
     def effect_per_fold(self, fold, current_folds, current_cpds):
@@ -302,7 +302,7 @@ class FoldMetabolism:
         # print(f"{potential_rules2rn=}")
         cx,rx = self.fold_expand(self._m, potential_fold_set, potential_rules2rn, self._f.fold_independent_rns, current_cpds)
 
-        return potential_rules2rn, set(cx), set(rx)
+        return potential_rules2rn, cx, rx #set(cx), set(rx)
 
     def loop_through_folds(self, current_folds, current_cpds):
         next_iter_possible_folds = self.next_iter_possible_folds(current_folds)
@@ -311,6 +311,7 @@ class FoldMetabolism:
             _fdict = dict()
             _fdict["rules2rn"], _fdict["cpds"], _fdict["rns"] = self.effect_per_fold(f, current_folds, current_cpds)
             f_effects[f] = _fdict
+        print(f"{f_effects=}")
         return f_effects
 
     def maxreactions(f_effects):
@@ -354,22 +355,30 @@ class FoldMetabolism:
             "rns":dict(), 
             "folds":{"fold_independent":0}
             }
+        
         ## Avoid updating folds on the 0th iteration since they don't apply until iteration=1
         iteration_dict = self.update_iteration_dict(iteration_dict, {k:v for k,v in current.items() if k!="folds"}, iteration)
         remaining_folds = (self.scope_folds - current["folds"])
         iteration+=1
+
+        print("iteration dict INIT: ", iteration_dict)
+        print("current dict INIT: ", current)
 
         ## First expansion (using only seed folds and fold independent reactions)
         init_rules2rn = self.folds2rules(current["folds"], self.scope_rules2rn)
         current["cpds"], current["rns"] = self.fold_expand(self._m, current["folds"], init_rules2rn, self._f.fold_independent_rns, current["cpds"])
         iteration_dict = self.update_iteration_dict(iteration_dict, current, iteration)
 
+        print("iteration dict after first expansion: ", iteration_dict)
+        print("current dict after first expansion: ", current)
+
+
         while keepgoing:
             start = timeit.default_timer()
+            iteration += 1
             print("\nITERATION: ", iteration)
             print("maximum n folds remaining: ", len(remaining_folds))
             print("maximum remaining_folds:\n", remaining_folds)
-            iteration += 1
             next_fold, fdata = self.select_next_fold(current["folds"], current["cpds"])
             print("next fold: ", next_fold)
             print("fdata:")
@@ -377,20 +386,23 @@ class FoldMetabolism:
             exec_time = timeit.default_timer() - start
             print("iteration runtime: ", exec_time)
             remaining_folds = (remaining_folds - set([next_fold]))
+            if len(remaining_folds) == 0:
+                keepgoing = False
 
             ## Stop conditions
             if (fdata["cpds"] == current["cpds"]) and (fdata["rns"] == current["rns"]):
-                keepgoing = False
-            elif len(remaining_folds) == 0:
-                keepgoing = False
-            
-            ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
-            current["folds"] = (current["folds"] | set([next_fold]))
-            current["cpds"] = fdata["cpds"]
-            current["rns"] = fdata["rns"]
-            
-            ## Store when cpds and rns appear in the expansion
-            iteration_dict = self.update_iteration_dict(iteration_dict, current, iteration)
+                print("CPDS AND RNS NOT CHANGING!!")
+                keepgoing = False               
+            else:
+                ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
+                current["folds"] = (current["folds"] | set([next_fold]))
+                current["cpds"] = fdata["cpds"]
+                current["rns"] = fdata["rns"]
+                
+                ## Store when cpds and rns appear in the expansion
+                iteration_dict = self.update_iteration_dict(iteration_dict, current, iteration)
+
+                
 
         return current, iteration_dict
             
