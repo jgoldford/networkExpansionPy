@@ -219,33 +219,143 @@ class FoldMetabolism:
                             fold2equalfold[k].add(k2)
         
         return fold2foldsubset, fold2foldstrictsubset, fold2equalfold
-
+    ##############################
     def filter_next_iter_to_foldsets_enabling_new_reactions(self, current_folds):
-
-        # for rule, rn in self.scope_rules2rn.item():
-        #     foldset = rule - current_folds
-        #     future_folds = current_folds | foldset
-        #     future_foldrules2rns = {k:v for k,v in self.scope_rules2rn.items() if k <= future_folds}
         current_fold2rn = {k:v for k,v in self.scope_rules2rn.items() if k <= current_folds}
         current_rns = set([rn for v in current_fold2rn.values() for rn in v])
-        # foldsets_enabling_no_new_reactions = set([k for k,v in self.scope_rules2rn.items() if v <= current_rns])
-        ## Think i can skip the above line, and just return:
-        return {k:v for k,v in self.scope_rules2rn.items() if not v <= current_rns}
+        # return {k:v for k,v in self.scope_rules2rn.items() if not v <= current_rns} ## rules2rn only which enable new reactions
+        ## to make this in the same format as below, need k=rule, v=reactions enabled by that rule plus all reactions which are already enabled.
+        ## e.g.
+        return {k:(v | current_rns) for k,v in self.scope_rules2rn.items() if not v <= current_rns}
 
-        # future_fold2rns = dict()
-        # for fold in self.scope_folds-current_folds:
-        #     future_folds = current_folds | set([fold])
-        #     future_foldrules2rns = {k:v for k,v in self.scope_rules2rn.items() if k <= future_folds}
-        #     future_rns = set([rn for v in future_foldrules2rns.values() for rn in v])
-        #     future_fold2rns[fold] = future_rns
+    def create_equal_fold_groups(self, fold2equalfold):
 
-        # current_fold2rn = {k:v for k,v in self.scope_rules2rn.items() if k <= current_folds}
-        # current_rns = set([rn for v in current_fold2rn.values() for rn in v])
-        # folds_enabling_no_new_reactions = set([k for k,v in future_fold2rns.items() if v==current_rns])
-        # print("-> Folds enabling no new reactions during the next NEXT ITERATION removed\n-> ... %i folds available for the NEXT ITERATION"%len(set(future_fold2rns.keys()) - folds_enabling_no_new_reactions))
+        # create set of equal fold rule groups, will be a set of frozensets of frozensets (!). Middle frozenset contains equivilent rules. Inner most frozenset contains a single rule.
+        equal_rule_groups = []
+        for k,v in fold2equalfold.items():
+            equal_rule_group = [k]
+            for fs in v:
+                if len(fs)>0:
+                    equal_rule_group.append(fs)
+            equal_rule_groups.append(frozenset(equal_rule_group))        
+        equal_rule_groups = set(equal_rule_groups)
+        ## go back through and make everything into sorted tuples for repeatability
+        return [sorted([sorted(i) for i in group]) for group in equal_rule_groups]
 
-        ## need to ouput if a fold doesn't do anything either--that is, by its addition to the existing foldset, it won't be able to enable any new reactions
-        # return {k:v for k,v in self.scope_rules2rn.items() if k not in foldsets_enabling_no_new_reactions}
+    # def all_strictsuperset_rules(self, fold2foldstrictsubset):
+    #     strictsubset_rules = set([frozenset(j) for i in fold2foldstrictsubset.values() for j in i])
+    #     return set([i for i in fold2foldstrictsubset.keys() if i not in strictsubset_rules])
+    
+    def filter_next_iter_to_foldsetsupersets(self, future_fold2rns):
+        _, fold2foldstrictsubset, fold2equalfold = self.create_foldrule2subset(future_fold2rns)
+        
+        equal_rule_groups = create_equal_fold_groups(fold2equalfold)
+
+        strictsubset_rules = set([frozenset(j) for i in fold2foldstrictsubset.values() for j in i])
+        strictsuperset_rules = set([i for i in fold2foldstrictsubset.keys() if i not in strictsubset_rules]) 
+        
+        equal_rule_groups_that_arent_subsets = {i for i in equal_rule_groups if i[0] not in strictsubset_rules} # only need to check 1 fold per group since they're equal
+        ## I should modify the below line to always return the smallest len() equivilent rule. BUT it is possible that a longer rule will include just 1 required new fold, so it should be chosen above a 2-fold rule where both folds are new.
+        ## Maybe need to break this into two functions, one returns the strict supersets, one returns equivilent rules
+        ## for equivilent rules in groups, choose rule where (rule_fold_i - current_folds) are shortest in length. if tie, sort rules, and sort groups, and choose first
+        # smallest_number_fold_from_each_group = {i[0] for i in equal_rule_groups_that_arent_subsets} # replicatable sorting
+
+        ## Only need to expand 1. strict superset folds, and 2. one fold from each equal_fold_group, provided that group is not in strictsubset_folds
+        return strictsuperset_rules, equal_rule_groups_that_arent_subsets
+
+    def organize_set_elements_by_size(self, myset):
+        element_lengths = dict()
+        for i in myset:
+            if not len(i) in element_lengths:
+                element_lengths[len(i)] = [i]
+            else:
+                element_lengths[len(i)].append(i)
+        return element_lengths
+
+    def remove_current_folds_from_rules(self, current_folds, rules):
+        new_rules = [i - current_folds for i in rules]
+        return [i for i in new_rules if len(i)>0]
+    
+    def next_iter_possible_foldsets(self, current_folds):
+
+        ## Need to run these two calls every iteration of the fold expansion
+        future_fold2rns = self.filter_next_iter_to_folds_enabling_new_reactions(current_folds)
+        strictsuperset_rules, equal_rule_groups_that_arent_subsets = self.filter_next_iter_to_foldsupersets(future_fold2rns)
+        ## Filter to strictsuperset_rules that only require a single additional fold from the current set
+        ##      Only try other ones if single fold additions don't yeild any new reactions
+        ## Filter to equal_rule_groups_that_arent_subsets that only require a single additional fold from the current set
+        ##      Only try other ones if single fold additions don't yeild any new reactions
+        strictsuperset_rule_dict = self.organize_set_elements_by_size(self.remove_current_folds_from_rules(current_folds, strictsuperset_rules))
+        equal_rule_dict = self.organize_set_elements_by_size(self.remove_current_folds_from_rules(current_folds, equal_rule_groups_that_arent_subsets))
+
+        
+
+        
+
+
+        # print("-> Folds whose rules correspond to reactions which are subsets of one another in the next NEXT ITERATION removed\n-> ... %i folds available for the NEXT ITERATION"%len(filtered_folds_to_expand))
+        return strictsuperset_rule_dict, equal_rule_dict #filtered_folds_to_expand
+
+    def effect_per_rule(self, rule, current_folds, current_cpds):
+        """
+        self.folds2rules
+        self.scope_rules2rn
+        self._m
+        """
+
+        potential_fold_set = (current_folds | set([rule]))
+        # print(f"{potential_fold_set=}")
+        potential_rules2rn = self.folds2rules(potential_fold_set, self.scope_rules2rn)
+        # print(f"{potential_rules2rn=}")
+        cx,rx = self.fold_expand(self._m, potential_fold_set, potential_rules2rn, self._f.fold_independent_rns, current_cpds)
+
+        return potential_rules2rn, cx, rx #set(cx), set(rx)
+
+    def loop_through_rules(self, current_folds, current_cpds):
+
+        strictsuperset_rule_dict, equal_rule_dict = self.next_iter_possible_foldsets(current_folds)
+
+        rule_sizes = set(list(strictsubset_folds_lengths.keys()) + list(equal_rule_dict.keys()))
+
+        for fsize in sorted(rule_sizes):
+            f_effects = dict()
+            if fsize in strictsuperset_rule_dict:
+                for rule in strictsuperset_rule_dict[fsize].values():
+                    _fdict = dict()
+                    _fdict["rules2rn"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule(f, current_folds, current_cpds)
+                    # print(f"{f_effects=}")
+                    if (_fdict["rns"] - current_rns) > 0:
+                        f_effects[f] = _fdict
+            if fsize in equal_rule_dict:
+                for rule in equal_rule_dict[fsize].values():
+                    _fdict = dict()
+                    _fdict["rules2rn"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule(f, current_folds, current_cpds)
+                    # print(f"{f_effects=}")
+                    if (_fdict["rns"] - current_rns) > 0:
+                        f_effects[f] = _fdict
+
+            ## Don't look for longer rules if shorter rules enable new reactions
+            if len(f_effects) > 1:
+                break
+
+        ## f_effects now only fills will rules that actually end up adding reactions
+        return f_effects
+
+    def maxreactions(f_effects):
+        """Doesn't use self"""
+        k_vcount = {k:len(v["rns"]) for k,v in f_effects.items()}
+        k_vcount = dict(sorted(k_vcount.items())) ## Sort for reproduceability
+        return max(k_vcount, key = k_vcount.get)
+
+    def select_next_fold(self, current_folds, current_cpds, fselect_func=maxreactions):
+        """Doesn't use self"""
+        f_effects = self.loop_through_rules(current_folds, current_cpds)
+        # print("feffects:")
+        # pprint(f_effects)
+        next_fold = fselect_func(f_effects)
+        return next_fold, f_effects[next_fold]
+
+    ##############################        
 
     def filter_next_iter_to_folds_enabling_new_reactions(self, current_folds):
         """
