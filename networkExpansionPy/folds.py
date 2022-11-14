@@ -217,11 +217,6 @@ class FoldMetabolism:
         ## transform to lists of lists of rules for the purposes of sortability/reproducability
         return [sorted([sorted(i) for i in group]) for group in equal_groups]
 
-
-    ##############################
-    def free_rules(self, current_rns, current_folds):
-        return {k for k,v in self.scope_rules2rn.items() if (v <= current_rns) and not (k <= current_folds)}
-
     def filter_next_iter_to_rules_enabling_new_reactions(self, current_folds):
         current_fold2rn = {k:v for k,v in self.scope_rules2rn.items() if k <= current_folds}
         current_rns = set([rn for v in current_fold2rn.values() for rn in v])
@@ -337,6 +332,9 @@ class FoldMetabolism:
                 if i not in iteration_dict[dtype]:
                     iteration_dict[dtype][i] = iteration
         return iteration_dict
+    
+    def free_rules(self, current_rns, current_folds):
+        return {k for k,v in self.scope_rules2rn.items() if (v <= current_rns) and not (k <= current_folds)}
 
     def rule_order(self, free_rules=True):
 
