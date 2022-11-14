@@ -303,7 +303,7 @@ class FoldMetabolism:
                     new_group.append(new_rule)
             if len(new_group) > 0:
                 new_rule_groups.append(new_group)
-        print(new_rule_groups)
+        # print(new_rule_groups)
         return new_rule_groups
     
     def next_iter_possible_rules(self, current_folds):
@@ -317,7 +317,7 @@ class FoldMetabolism:
         ##      Only try other ones if single fold additions don't yeild any new reactions
         strictsuperset_rule_dict = self.organize_set_elements_by_size(self.remove_current_folds_from_rules(current_folds, strictsuperset_rules))
         equal_rule_dict = self.organize_equal_rule_groups_by_size(self.remove_current_folds_from_equal_rule_groups(current_folds, equal_rule_groups_that_arent_subsets))
-        print(equal_rule_dict)
+        # print(equal_rule_dict)
         ## How do i handle making the equal_rule dict? i think after I create the current_fold_from_equal_rule_groups
         ##      I need to make a dict within each equal_rule_group. Done.
         ## equal_rule_dict is now a list of dicts, where each dict contains equivilent rule sets
@@ -332,7 +332,7 @@ class FoldMetabolism:
         self._m
         """
 
-        potential_fold_set = (current_folds | set([rule]))
+        potential_fold_set = (current_folds | set(rule))
         # print(f"{potential_fold_set=}")
         potential_rules2rn = self.folds2rules(potential_fold_set, self.scope_rules2rn)
         # print(f"{potential_rules2rn=}")
@@ -345,27 +345,38 @@ class FoldMetabolism:
         strictsuperset_rule_dict, equal_rule_dict = self.next_iter_possible_rules(current_folds)
 
         rule_sizes = set(list(strictsuperset_rule_dict.keys()) + [i for d in equal_rule_dict for i in d.keys()])
+        print(f"{rule_sizes=}")
+        print(f"{strictsuperset_rule_dict=}")
+        print(f"{equal_rule_dict=}")
 
         for fsize in sorted(rule_sizes):
+            # print(f"{fsize=}")
             f_effects = dict()
             if fsize in strictsuperset_rule_dict:
                 for rule in strictsuperset_rule_dict[fsize]:
+                    # print("superset...")
+                    # print(f"{rule=}")
                     _fdict = dict()
                     _fdict["rules2rn"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule(rule, current_folds, current_cpds)
-                    # print(f"{f_effects=}")
+                    # if rule==frozenset({'246'}):
+                    #     print(f"{_fdict['rns']=}")
+                    #     print(f"{current_rns=}")
                     if len(_fdict["rns"] - current_rns) > 0:
-                        f_effects[f] = _fdict
+                        # print("RULE CREATES NEW REACTIONS VIA SUPERSET RULES")
+                        f_effects[rule] = _fdict
             for d in equal_rule_dict:
                 if fsize in d:
                     for rule in d[fsize]:
+                        # print("equal...")
                         _fdict = dict()
                         _fdict["rules2rn"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule(rule, current_folds, current_cpds)
-                        # print(f"{f_effects=}")
+                        # print(f"{_fdict=}")
                         if len(_fdict["rns"] - current_rns) > 0:
-                            f_effects[f] = _fdict
+                            # print("RULE CREATES NEW REACTIONS VIA EQUAL RULES")
+                            f_effects[rule] = _fdict
 
             ## Don't look for longer rules if shorter rules enable new reactions
-            if len(f_effects) > 1:
+            if len(f_effects) > 0:
                 break
 
         ## f_effects now only fills will rules that actually end up adding reactions
