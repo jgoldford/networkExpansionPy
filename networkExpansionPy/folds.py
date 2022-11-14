@@ -220,12 +220,16 @@ class FoldMetabolism:
         
         return fold2foldsubset, fold2foldstrictsubset, fold2equalfold
     ##############################
+    def free_rules(self, current_rns):
+        return {k for k,v in self.scope_rules2rn.items() if v <= current_rns}
+
     def filter_next_iter_to_rules_enabling_new_reactions(self, current_folds):
         current_fold2rn = {k:v for k,v in self.scope_rules2rn.items() if k <= current_folds}
         current_rns = set([rn for v in current_fold2rn.values() for rn in v])
         # return {k:v for k,v in self.scope_rules2rn.items() if not v <= current_rns} ## rules2rn only which enable new reactions
         ## to make this in the same format as below, need k=rule, v=reactions enabled by that rule plus all reactions which are already enabled.
         ## e.g.
+        print("")
         return {k:(v | current_rns) for k,v in self.scope_rules2rn.items() if not v <= current_rns}
 
     def create_equal_rule_groups(self, fold2equalfold):
@@ -310,6 +314,7 @@ class FoldMetabolism:
 
         ## Need to run these two calls every iteration of the fold expansion
         future_fold2rns = self.filter_next_iter_to_rules_enabling_new_reactions(current_folds)
+        print(f"{future_fold2rns=}")
         strictsuperset_rules, equal_rule_groups_that_arent_subsets = self.filter_next_iter_to_rulesupersets(future_fold2rns)
         ## Filter to strictsuperset_rules that only require a single additional fold from the current set
         ##      Only try other ones if single fold additions don't yeild any new reactions
@@ -396,7 +401,7 @@ class FoldMetabolism:
         next_rule = fselect_func(f_effects)
         return next_rule, f_effects[next_rule]
 
-    def rule_order(self):
+    def rule_order(self, free_rules=True):
 
         if (self.seed_cpds == None) or (self.seed_folds == None):
             raise ValueError("self.seed_cpds and self.seed_folds must not be None")
@@ -408,8 +413,7 @@ class FoldMetabolism:
             "rns":set([])
             }
         
-        ## Initialize iteration data
-        keepgoing = True 
+        ## Initialize iteration data 
         iteration = 0
         iteration_dict = {
             "cpds":dict(), 
@@ -419,7 +423,6 @@ class FoldMetabolism:
         
         ## Avoid updating folds on the 0th iteration since they don't apply until iteration=1
         iteration_dict = self.update_iteration_dict(iteration_dict, {k:v for k,v in current.items() if k!="folds"}, iteration)
-        remaining_folds = (self.scope_folds - current["folds"])
         iteration+=1
 
         # print("iteration dict INIT: ", iteration_dict)
@@ -428,7 +431,18 @@ class FoldMetabolism:
         ## First expansion (using only seed folds and fold independent reactions)
         init_rules2rn = self.folds2rules(current["folds"], self.scope_rules2rn)
         current["cpds"], current["rns"] = self.fold_expand(self._m, current["folds"], init_rules2rn, self._f.fold_independent_rns, current["cpds"])
+        ## Add free folds to current dict
+        free_folds = {i for fs in self.free_rules(current["rns"]) for i in fs}
+        if free_rules == True: ## Append free_folds to data dict
+            current["folds"] = (current["folds"] | free_folds)
+        remaining_folds = (self.scope_folds - current["folds"] - free_folds) ## Remove the free folds from the remaining folds regardless
         iteration_dict = self.update_iteration_dict(iteration_dict, current, iteration)
+
+        ## Needed in case expansion not possible at all
+        if len(remaining_folds) > 0:
+            keepgoing = True
+        else:
+            keepgoing = False
 
         # print("iteration dict after first expansion: ", iteration_dict)
         # print("current dict after first expansion: ", current)
@@ -440,13 +454,16 @@ class FoldMetabolism:
             print("\nITERATION: ", iteration)
             print("maximum n folds remaining: ", len(remaining_folds))
             print("maximum remaining_folds:\n", remaining_folds)
+            print("folds2rules: ", self.folds2rules(remaining_folds, self.scope_rules2rn))
             next_rule, fdata = self.select_next_rule(current["folds"], current["cpds"], current["rns"])
             print("next fold: ", next_rule)
             print("fdata:")
             pprint(fdata)
             exec_time = timeit.default_timer() - start
             print("iteration runtime: ", exec_time)
-            remaining_folds = (remaining_folds - set(next_rule))
+            free_folds = {i for fs in self.free_rules(current_rns) for i in fs}
+            print("free folds: ", free_folds)
+            remaining_folds = (remaining_folds - set(next_rule) - free_folds)
             if len(remaining_folds) == 0:
                 keepgoing = False
 
@@ -464,7 +481,10 @@ class FoldMetabolism:
 
             else:
                 ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
-                current["folds"] = (current["folds"] | set(next_rule))
+                if free_rules == True: ## Append free_folds to data dict
+                    current["folds"] = (current["folds"] | set(next_rule) | free_folds)
+                else:
+                    current["folds"] = (current["folds"] | set(next_rule))
                 current["cpds"] = fdata["cpds"]
                 current["rns"] = fdata["rns"]
                 
