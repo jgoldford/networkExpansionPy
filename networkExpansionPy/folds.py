@@ -5,6 +5,7 @@ from pathlib import PurePath, Path
 from copy import copy, deepcopy
 import timeit
 from pprint import pprint
+from collections import Counter
 
 asset_path = PurePath(__file__).parent / "assets"
 
@@ -220,8 +221,8 @@ class FoldMetabolism:
         
         return fold2foldsubset, fold2foldstrictsubset, fold2equalfold
     ##############################
-    def free_rules(self, current_rns):
-        return {k for k,v in self.scope_rules2rn.items() if v <= current_rns}
+    def free_rules(self, current_rns, current_folds):
+        return {k for k,v in self.scope_rules2rn.items() if (v <= current_rns) and not (k <= current_folds)}
 
     def filter_next_iter_to_rules_enabling_new_reactions(self, current_folds):
         current_fold2rn = {k:v for k,v in self.scope_rules2rn.items() if k <= current_folds}
@@ -351,6 +352,12 @@ class FoldMetabolism:
 
         rule_sizes = set(list(strictsuperset_rule_dict.keys()) + [i for d in equal_rule_dict for i in d.keys()])
         print(f"{rule_sizes=}")
+        print("strict superset rule dict lens:")
+        pprint({k:len(v) for k,v in strictsuperset_rule_dict.items()})
+        print(f"{len(equal_rule_dict)=}")
+        print("lens of rules in equal_rule_dict: ", Counter([k for d in equal_rule_dict for k,v in d.items()]))
+        print("n rules remaining: ", len(strictsuperset_rule_dict)+len(equal_rule_dict))
+        print("")
         print(f"{strictsuperset_rule_dict=}")
         print(f"{equal_rule_dict=}")
 
@@ -432,7 +439,9 @@ class FoldMetabolism:
         init_rules2rn = self.folds2rules(current["folds"], self.scope_rules2rn)
         current["cpds"], current["rns"] = self.fold_expand(self._m, current["folds"], init_rules2rn, self._f.fold_independent_rns, current["cpds"])
         ## Add free folds to current dict
-        free_folds = {i for fs in self.free_rules(current["rns"]) for i in fs}
+        free_folds = {i for fs in self.free_rules(current["rns"], current["folds"]) for i in fs}
+        print("current folds: ", current["folds"])
+        print("free folds: ", free_folds)
         if free_rules == True: ## Append free_folds to data dict
             current["folds"] = (current["folds"] | free_folds)
         remaining_folds = (self.scope_folds - current["folds"] - free_folds) ## Remove the free folds from the remaining folds regardless
@@ -461,7 +470,7 @@ class FoldMetabolism:
             pprint(fdata)
             exec_time = timeit.default_timer() - start
             print("iteration runtime: ", exec_time)
-            free_folds = {i for fs in self.free_rules(current_rns) for i in fs}
+            free_folds = {i for fs in self.free_rules(fdata["rns"], (current["folds"] | set(next_rule))) for i in fs}
             print("free folds: ", free_folds)
             remaining_folds = (remaining_folds - set(next_rule) - free_folds)
             if len(remaining_folds) == 0:
