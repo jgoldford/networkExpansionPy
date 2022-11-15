@@ -161,6 +161,64 @@ def create_equal_rule_groups(rule2rn):
 
     ## transform to lists of lists of rules for the purposes of sortability/reproducability
     return [sorted([sorted(i) for i in group]) for group in equal_groups]
+
+def rule_sizes(rule_group):
+    """
+    Returns a dictionary of len:collections for collections in rule_group
+
+    :param rule_group: a set of collections
+    :return: dictionary keyed by lengths of each collection in value
+    """
+    element_lengths = dict()
+    for i in rule_group:
+        l = len(i)
+        if not l in element_lengths:
+            element_lengths[l] = [i]
+        else:
+            element_lengths[l].append(i)
+    return element_lengths
+
+
+## SHOULD JUST GET RID OF THIS FUNC SINCE I MADE IT A ONE LINER
+def organize_equal_rule_groups_by_size(listoflists):
+    """ 
+    Returns a list of dictionaries. Each dictionary contains equivilent rules, organized by their sizes.
+
+    :param listoflists: a collection of equivilent rule groups
+    :return: a list of equivilent rule groups dictionaries, where the dictionaries are keyed by rule group size
+    """
+    ## each inner list should turn into a dict organized by size
+    # outer_list = []
+    # for i in listoflists:
+    #     outer_list.append(rule_sizes(i))
+    # return outer_list
+    return [rule_sizes(i) for i in listoflists]
+
+def remove_current_folds_from_equal_rule_groups(current_folds, rule_groups):
+
+    new_rule_groups = []
+    for rg in rule_groups:
+        new_group = []
+        # this construction allows us to preserve the ordering from create_equal_rule_groups
+        for i in rg:
+            new_rule = frozenset(i) - current_folds
+            if len(i) > 0:
+                new_group.append(new_rule)
+        if len(new_group) > 0:
+            new_rule_groups.append(new_group)
+
+    return new_rule_groups
+
+def next_iter_possible_rules(self, current_folds, rule2rn):
+
+    ## Need to run these two calls every iteration of the fold expansion
+    future_rule2rns = rule2rn_enabling_new_rn(current_folds, rule2rn)
+    print(f"{future_rule2rns=}")
+    equal_rule_groups_that_arent_subsets = create_equal_rule_groups(future_rule2rns)
+    equal_rule_dict = organize_equal_rule_groups_by_size(remove_current_folds_from_equal_rule_groups(current_folds, equal_rule_groups_that_arent_subsets))
+
+    # print("-> Folds whose rules correspond to reactions which are subsets of one another in the next NEXT ITERATION removed\n-> ... %i folds available for the NEXT ITERATION"%len(filtered_folds_to_expand))
+    return equal_rule_dict #filtered_folds_to_expand
 ########################################################################################################################
 
 class GlobalFoldNetwork:
@@ -236,50 +294,15 @@ class FoldMetabolism:
         scope_cpds, scope_rns = self._m.expand(seed_cpds, reaction_mask=rn_tup_set)
         return set(scope_cpds), set([i[0] for i in scope_rns])
 
-    def organize_set_elements_by_size(self, myset):
-        element_lengths = dict()
-        for i in myset:
-            if not len(i) in element_lengths:
-                element_lengths[len(i)] = [i]
-            else:
-                element_lengths[len(i)].append(i)
-        return element_lengths
-
-    def organize_equal_rule_groups_by_size(self, listoflists):
-        ## each inner list should turn into a dict organized by size
-        outer_list = []
-        for i in listoflists:
-            outer_list.append(self.organize_set_elements_by_size(i))
-        return outer_list
-
-    def remove_current_folds_from_equal_rule_groups(self, current_folds, rule_groups):
-
-        new_rule_groups = []
-        for rg in rule_groups:
-            new_group = []
-            # this construction allows us to preserve the ordering from create_equal_rule_groups
-            for i in rg:
-                new_rule = frozenset(i) - current_folds
-                if len(i) > 0:
-                    new_group.append(new_rule)
-            if len(new_group) > 0:
-                new_rule_groups.append(new_group)
-
-        return new_rule_groups
-    
-    def next_iter_possible_rules(self, current_folds):
-
-        ## Need to run these two calls every iteration of the fold expansion
-        future_rule2rns = rule2rn_enabling_new_rn(current_folds, self.scope_rules2rn)
-        print(f"{future_rule2rns=}")
-        equal_rule_groups_that_arent_subsets = create_equal_rule_groups(future_rule2rns)
-        equal_rule_dict = self.organize_equal_rule_groups_by_size(self.remove_current_folds_from_equal_rule_groups(current_folds, equal_rule_groups_that_arent_subsets))
-
-        # print("-> Folds whose rules correspond to reactions which are subsets of one another in the next NEXT ITERATION removed\n-> ... %i folds available for the NEXT ITERATION"%len(filtered_folds_to_expand))
-        return equal_rule_dict #filtered_folds_to_expand
-
     def fold_expand(self, rule2rns, cpds):
-        """Doesn't use self"""
+        """
+        Returns a set of compounds and set of reactions enabled by expansion 
+        using `cpds` and the reactions from `rule2rns` and fold_independent 
+        reactions.
+
+        :param cpds: collection of compound ids
+        :return: set of compounds and set of reactions from the expansion
+        """
         fold_rns = set([i for s in rule2rns.values() for i in s])
         rn_tup_set = set(self._m.rxns2tuple(fold_rns | self._f.fold_independent_rns))
         cx,rx = self._m.expand(cpds, reaction_mask=rn_tup_set)
@@ -299,7 +322,7 @@ class FoldMetabolism:
 
     def loop_through_rules(self, current_folds, current_cpds, current_rns):
 
-        equal_rule_dict = self.next_iter_possible_rules(current_folds)
+        equal_rule_dict = self.next_iter_possible_rules(current_folds, self.scope_rule2rn)
 
         rule_sizes = set(list([i for d in equal_rule_dict for i in d.keys()]))
         print(f"{rule_sizes=}")
