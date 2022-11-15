@@ -109,6 +109,46 @@ def create_foldrules2rn(rn2fold):
             else:
                 fold2rn[fs] = set([rn])
     return fold2rn
+
+def subset_rules2rn(folds, rules):
+    """
+    Returns a dictionary of rules:rns enabled by folds
+    
+    :param folds: collection of folds used to subset the rules dict
+    :param rules: dict of rule:rns mappings to subset from
+    :return: dictionary of rules:rns enabled by folds
+    """
+    return {k:v for k,v in rules.items() if k <= set(folds)}
+
+def create_equal_rule_groups(rule2rn):
+    """
+    Returns a sorted list of equivilent rule collections.
+
+    Collections and list are each sorted.
+
+    :param rule2rn: dict of rule:rns to create equal rule groups from
+    :return: a sorted list of equivilent rule collections (each sorted)
+    """
+
+    strictsubset_ks = set()
+    equal_groups = set()
+    for k, v in rule2rn.items():
+        equal_ks = {k}
+        for k2, v2 in rule2rn.items():
+            if k != k2:
+                if v2 <= v:
+                    if v2!=v:
+                        strictsubset_ks.add(k2)
+                    else: # v2==v
+                        equal_ks.add(k2)
+        
+        equal_groups.add(frozenset(equal_ks))
+
+    ## exclude groups which include any strict subset rules
+    equal_groups = {i for i in equal_groups if not i & strictsubset_ks}
+
+    ## transform to lists of lists of rules for the purposes of sortability/reproducability
+    return [sorted([sorted(i) for i in group]) for group in equal_groups]
 ########################################################################################################################
 
 class GlobalFoldNetwork:
@@ -184,42 +224,6 @@ class FoldMetabolism:
         scope_cpds, scope_rns = self._m.expand(seed_cpds, reaction_mask=rn_tup_set)
         return set(scope_cpds), set([i[0] for i in scope_rns])
 
-    def folds2rules(self, folds, rules):
-        """
-        Returns a dictionary of rules:rns enabled by folds
-        
-        :param folds: collection of folds used to subset the rules dict
-        :param rules: dict of rule:rns mappings to subset from
-        :return: dictionary of rules:rns enabled by folds
-        """
-        return {k:v for k,v in rules.items() if k <= set(folds)}
-
-    def create_k2equalk(self, k2collection):
-        """
-        Can i vastly simplify this by just creating two groups? finding all rules which are strict subsets of other rules,
-        and finding all equal rule groups (including rules which are strict supersets, and thus have an empty set of equal rules)
-        """
-
-        strictsubset_ks = set()
-        equal_groups = set()
-        for k, v in k2collection.items():
-            equal_ks = {k}
-            for k2, v2 in k2collection.items():
-                if k != k2:
-                    if v2 <= v:
-                        if v2!=v:
-                            strictsubset_ks.add(k2)
-                        else: # v2==v
-                            equal_ks.add(k2)
-            
-            equal_groups.add(frozenset(equal_ks))
-
-        ## exclude groups which include any strict subset rules
-        equal_groups = {i for i in equal_groups if not i & strictsubset_ks}
-
-        ## transform to lists of lists of rules for the purposes of sortability/reproducability
-        return [sorted([sorted(i) for i in group]) for group in equal_groups]
-
     def filter_next_iter_to_rules_enabling_new_reactions(self, current_folds):
         current_fold2rn = {k:v for k,v in self.scope_rules2rn.items() if k <= current_folds}
         current_rns = set([rn for v in current_fold2rn.values() for rn in v])
@@ -246,7 +250,7 @@ class FoldMetabolism:
         new_rule_groups = []
         for rg in rule_groups:
             new_group = []
-            # this construction allows us to preserve the ordering from create_k2equalk
+            # this construction allows us to preserve the ordering from create_equal_rule_groups
             for i in rg:
                 new_rule = frozenset(i) - current_folds
                 if len(i) > 0:
@@ -261,7 +265,7 @@ class FoldMetabolism:
         ## Need to run these two calls every iteration of the fold expansion
         future_rule2rns = self.filter_next_iter_to_rules_enabling_new_reactions(current_folds)
         print(f"{future_rule2rns=}")
-        equal_rule_groups_that_arent_subsets = self.create_k2equalk(future_rule2rns)
+        equal_rule_groups_that_arent_subsets = self.create_equal_rule_groups(future_rule2rns)
         equal_rule_dict = self.organize_equal_rule_groups_by_size(self.remove_current_folds_from_equal_rule_groups(current_folds, equal_rule_groups_that_arent_subsets))
 
         # print("-> Folds whose rules correspond to reactions which are subsets of one another in the next NEXT ITERATION removed\n-> ... %i folds available for the NEXT ITERATION"%len(filtered_folds_to_expand))
@@ -276,13 +280,12 @@ class FoldMetabolism:
 
     def effect_per_rule(self, rule, current_folds, current_cpds):
         """
-        self.folds2rules
         self.scope_rules2rn
         self._m
         """
 
         potential_fold_set = (current_folds | set(rule))
-        potential_rules2rn = self.folds2rules(potential_fold_set, self.scope_rules2rn)
+        potential_rules2rn = subset_rules2rn(potential_fold_set, self.scope_rules2rn)
         cx,rx = self.fold_expand(self._m, potential_fold_set, potential_rules2rn, self._f.fold_independent_rns, current_cpds)
 
         return potential_rules2rn, cx, rx #set(cx), set(rx)
@@ -367,7 +370,7 @@ class FoldMetabolism:
         # print("current dict INIT: ", current)
 
         ## First expansion (using only seed folds and fold independent reactions)
-        init_rules2rn = self.folds2rules(current["folds"], self.scope_rules2rn)
+        init_rules2rn = subset_rules2rn(current["folds"], self.scope_rules2rn)
         current["cpds"], current["rns"] = self.fold_expand(self._m, current["folds"], init_rules2rn, self._f.fold_independent_rns, current["cpds"])
         ## Add free folds to current dict
         free_folds = {i for fs in self.free_rules(current["rns"], current["folds"]) for i in fs}
@@ -393,7 +396,7 @@ class FoldMetabolism:
             print("\nITERATION: ", iteration)
             print("maximum n folds remaining: ", len(remaining_folds))
             print("maximum remaining_folds:\n", remaining_folds)
-            print("folds2rules: ", self.folds2rules(remaining_folds, self.scope_rules2rn))
+            print("subset_rules2rn: ", subset_rules2rn(remaining_folds, self.scope_rules2rn))
             next_rule, fdata = self.select_next_rule(current["folds"], current["cpds"], current["rns"])
             print("next fold: ", next_rule)
             print("fdata:")
