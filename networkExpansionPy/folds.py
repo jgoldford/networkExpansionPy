@@ -180,21 +180,30 @@ def rule_sizes(rule_group):
 
 
 ## SHOULD JUST GET RID OF THIS FUNC SINCE I MADE IT A ONE LINER
-def organize_equal_rule_groups_by_size(listoflists):
-    """ 
-    Returns a list of dictionaries. Each dictionary contains equivilent rules, organized by their sizes.
+# def organize_equal_rule_groups_by_size(listoflists):
+#     """ 
+#     Returns a list of dictionaries. Each dictionary contains equivilent rules, organized by their sizes.
 
-    :param listoflists: a collection of equivilent rule groups
-    :return: a list of equivilent rule groups dictionaries, where the dictionaries are keyed by rule group size
-    """
-    ## each inner list should turn into a dict organized by size
-    # outer_list = []
-    # for i in listoflists:
-    #     outer_list.append(rule_sizes(i))
-    # return outer_list
-    return [rule_sizes(i) for i in listoflists]
+#     :param listoflists: a collection of equivilent rule groups
+#     :return: a list of equivilent rule groups dictionaries, where the dictionaries are keyed by rule group size
+#     """
+#     ## each inner list should turn into a dict organized by size
+#     # outer_list = []
+#     # for i in listoflists:
+#     #     outer_list.append(rule_sizes(i))
+#     # return outer_list
+#     return [rule_sizes(i) for i in listoflists]
 
 def remove_current_folds_from_equal_rule_groups(current_folds, rule_groups):
+    """ 
+    Returns a list of rule groups with current folds removed.
+
+    Preserves ordering from `rule_groups`.
+
+    :param current_folds: collection of current folds
+    :param rule_groups: a collection of equivilent rule groups
+    :return: a list of rule groups with current folds removed
+    """
 
     new_rule_groups = []
     for rg in rule_groups:
@@ -210,15 +219,46 @@ def remove_current_folds_from_equal_rule_groups(current_folds, rule_groups):
     return new_rule_groups
 
 def next_iter_possible_rules(self, current_folds, rule2rn):
+    """
+    Returns a list of equal rule group dictionaries, keyed by rule size.
+
+    :param current_folds: collection of current folds
+    :param rule2rn: dict of rule:rns (should be for scope)
+    :return: a list of equal rule group dictionaries, keyed by rule size
+            [
+                {1:[rule1,rule2,rule2],3:[rule4,rule5]}, #dict of equal rules, 3 with len=1, 2 with len=3
+                {1:[rule7,rule8],3:[rule9]}              
+            ]
+    """
 
     ## Need to run these two calls every iteration of the fold expansion
     future_rule2rns = rule2rn_enabling_new_rn(current_folds, rule2rn)
     print(f"{future_rule2rns=}")
-    equal_rule_groups_that_arent_subsets = create_equal_rule_groups(future_rule2rns)
-    equal_rule_dict = organize_equal_rule_groups_by_size(remove_current_folds_from_equal_rule_groups(current_folds, equal_rule_groups_that_arent_subsets))
+    equal_rule_groups = create_equal_rule_groups(future_rule2rns)
+    equal_rule_groups = remove_current_folds_from_equal_rule_groups(current_folds, equal_rule_groups)
+    # equal_rule_dict = [rule_sizes(i) for i in equal_rule_groups]
 
     # print("-> Folds whose rules correspond to reactions which are subsets of one another in the next NEXT ITERATION removed\n-> ... %i folds available for the NEXT ITERATION"%len(filtered_folds_to_expand))
-    return equal_rule_dict #filtered_folds_to_expand
+    return [rule_sizes(i) for i in equal_rule_groups]
+
+def maxreactions(r_effects):
+    """
+    Returns the rule enabling the most reactions
+
+    :param r_effects: a dict of rule:{rule2rn:... , cpds:... , rns:...} 
+                      denoting the outcome of adding each rule.
+    :return: rule enabling the most reactions
+    """
+    k_vcount = {k:len(v["rns"]) for k,v in r_effects.items()}
+    k_vcount = dict(sorted(k_vcount.items())) ## Sort for reproduceability
+    return max(k_vcount, key = k_vcount.get)
+
+def update_iteration_dict(self, iteration_dict, current, iteration):
+    for dtype, ids in current.items():
+        for i in ids:
+            if i not in iteration_dict[dtype]:
+                iteration_dict[dtype][i] = iteration
+    return iteration_dict
 ########################################################################################################################
 
 class GlobalFoldNetwork:
@@ -310,19 +350,36 @@ class FoldMetabolism:
 
     def effect_per_rule(self, rule, current_folds, current_cpds):
         """
-        self.scope_rules2rn
-        self._m
+        Returns the outcomes of an expansion using current folds plus
+            folds from an additional `rule`.
+
+        :rule: collection of folds representing the rule
+        :current_folds: collection of current folds
+        :current_cpds: collection of current compounds
+        :return: dict of rule2rns, a set of compounds, and a set of reactions from 
+                 running an expansion using the current folds and the `rule` folds. 
         """
 
         potential_fold_set = (current_folds | set(rule))
-        potential_rules2rn = subset_rule2rn(potential_fold_set, self.scope_rules2rn)
-        cx,rx = self.fold_expand(potential_rules2rn, current_cpds)
+        potential_rule2rns = subset_rule2rn(potential_fold_set, self.scope_rules2rn)
+        cx,rx = self.fold_expand(potential_rule2rns, current_cpds)
 
-        return potential_rules2rn, cx, rx #set(cx), set(rx)
+        return potential_rule2rns, cx, rx #set(cx), set(rx)
 
     def loop_through_rules(self, current_folds, current_cpds, current_rns):
+        """
+        Loops through all remaining rules in the scope and returns a dict 
+            of rule:{rule2rn:... , cpds:... , rns:...} denoting the
+            outcome of adding each rule.
 
-        equal_rule_dict = self.next_iter_possible_rules(current_folds, self.scope_rule2rn)
+        :param current_folds: collection of current folds
+        :param current_cpds: collection of current cpds
+        :param current_rns: collection of current rns
+        :return: a dict of rule:{rule2rn:... , cpds:... , rns:...} 
+                 denoting the outcome of adding each rule.
+        """
+
+        equal_rule_dict = next_iter_possible_rules(current_folds, self.scope_rule2rn)
 
         rule_sizes = set(list([i for d in equal_rule_dict for i in d.keys()]))
         print(f"{rule_sizes=}")
@@ -332,47 +389,62 @@ class FoldMetabolism:
         print("")
         print(f"{equal_rule_dict=}")
 
-        for fsize in sorted(rule_sizes):
-            f_effects = dict()
+        for rsize in sorted(rule_sizes):
+            r_effects = dict()
             for d in equal_rule_dict:
-                if fsize in d:
+                if rsize in d:
                     # only look at first rule among equals
-                    rule = d[fsize][0]
+                    rule = d[rsize][0]
                     _fdict = dict()
                     _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule(rule, current_folds, current_cpds)
                     if len(_fdict["rns"] - current_rns) > 0:
-                        f_effects[rule] = _fdict
+                        r_effects[rule] = _fdict
 
             ## Don't look for longer rules if shorter rules enable new reactions
-            if len(f_effects) > 0:
+            if len(r_effects) > 0:
                 break
 
-        ## f_effects now only fills will rules that actually end up adding reactions
-        return f_effects
+        ## r_effects now only fills will rules that actually end up adding reactions
+        return r_effects
 
-    def maxreactions(f_effects):
-        """Doesn't use self"""
-        k_vcount = {k:len(v["rns"]) for k,v in f_effects.items()}
-        k_vcount = dict(sorted(k_vcount.items())) ## Sort for reproduceability
-        return max(k_vcount, key = k_vcount.get)
+    def select_next_rule(self, current_folds, current_cpds, current_rns, rselect_func=maxreactions):
+        """
+        Determines the next rule and its effects on cpds, rns, and rules, based on the selection function.
 
-    def select_next_rule(self, current_folds, current_cpds, current_rns, fselect_func=maxreactions):
-        """Doesn't use self"""
-        f_effects = self.loop_through_rules(current_folds, current_cpds, current_rns)
-        next_rule = fselect_func(f_effects)
-        return next_rule, f_effects[next_rule]
-
-    def update_iteration_dict(self, iteration_dict, current, iteration):
-        for dtype, ids in current.items():
-            for i in ids:
-                if i not in iteration_dict[dtype]:
-                    iteration_dict[dtype][i] = iteration
-        return iteration_dict
+        :param current_folds: collection of current folds
+        :param current_cpds: collection of current compounds
+        :param current_rns: collection of current reactions
+        :param rselect_func: function to use for identifying the next rule
+        :return: next_rule, and a dictionary of its effects {rule2rn:... , cpds:... , rns:...} 
+        """
+        r_effects = self.loop_through_rules(current_folds, current_cpds, current_rns)
+        next_rule = rselect_func(r_effects)
+        return next_rule, r_effects[next_rule]
     
     def free_rules(self, current_rns, current_folds):
+        """
+        Returns rules that weren't explicity added, yet whose reactions are already enabled.
+        
+        This can occur for example if a rule is a subset of another rule which was selected.
+
+        :current_rns: collection of current reactions
+        :current_folds: collection of current folds
+        :return: a set of rules whose folds are not part of current_folds, yet whose reactions
+                 are all already enabled.
+        """
         return {k for k,v in self.scope_rules2rn.items() if (v <= current_rns) and not (k <= current_folds)}
 
     def rule_order(self, free_rules=True):
+        """
+        Determine the ordering of all rules/folds.
+
+        :kwarg free_rules: if True, add rules/folds to the iteration_dict that
+                           weren't selected, but whose reactions are all
+                           already enabled.
+
+                           (Probably I want to just remove this kwarg and
+                            always have this enabled...)
+        """
 
         if (self.seed_cpds == None) or (self.seed_folds == None):
             raise ValueError("self.seed_cpds and self.seed_folds must not be None")
