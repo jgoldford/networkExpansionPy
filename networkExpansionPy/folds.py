@@ -285,9 +285,9 @@ class GlobalFoldNetwork:
         self.folds = set([i for fs in self.rule2rns.keys() for i in fs]) ## all folds
         self.fold_independent_rns = fold_independent_rns
 
-        print("GlobalFoldNetwork initialized")
-        print("\n%i folds available in RUN"%(len(self.folds)))
-        print("\n%i rules available in RUN"%(len(self.rule2rns)))
+        print("GlobalFoldNetwork initialized\n")
+        print("%i folds available in RUN"%(len(self.folds)))
+        print("%i rules available in RUN"%(len(self.rule2rns)))
 
 class FoldMetabolism:
     """
