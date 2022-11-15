@@ -218,7 +218,7 @@ def remove_current_folds_from_equal_rule_groups(current_folds, rule_groups):
 
     return new_rule_groups
 
-def next_iter_possible_rules(self, current_folds, rule2rn):
+def next_iter_possible_rules(current_folds, rule2rn):
     """
     Returns a list of equal rule group dictionaries, keyed by rule size.
 
@@ -238,9 +238,9 @@ def next_iter_possible_rules(self, current_folds, rule2rn):
     # print(f"{future_rule2rns=}")
     # equal_rule_dict = [rule_sizes(i) for i in equal_rule_groups]
 
-    print("\tEliminated folds/rules that enable subsets of others' reactions.")
-    print("\t\t%i folds available for the NEXT ITERATION"%len(set([f for g in equal_rule_groups for r in g for f in r])))
-    print("\t\t%i rules available for the NEXT ITERATION"%len(equal_rule_groups))
+    # print("\tEliminated folds/rules that enable subsets of others' reactions.")
+    # print("\t\t%i folds available for the NEXT ITERATION"%len(set([f for g in equal_rule_groups for r in g for f in r])))
+    # print("\t\t%i rules available for the NEXT ITERATION"%len(equal_rule_groups))
     return [rule_sizes(i) for i in equal_rule_groups]
 
 def maxreactions(r_effects):
@@ -255,7 +255,7 @@ def maxreactions(r_effects):
     k_vcount = dict(sorted(k_vcount.items())) ## Sort for reproduceability
     return max(k_vcount, key = k_vcount.get)
 
-def update_iteration_dict(self, iteration_dict, current, iteration):
+def update_iteration_dict(iteration_dict, current, iteration):
     """ 
     Adds the iteration at which new compounds, reactions, and folds appear
         throughout the fold/rule expansion.
@@ -400,7 +400,7 @@ class FoldMetabolism:
                  - n_equal_rule_groups for metadata purposes
         """
 
-        equal_rule_dict = next_iter_possible_rules(current_folds, self.scope_rule2rn)
+        equal_rule_dict = next_iter_possible_rules(current_folds, self.scope_rules2rn)
 
         rule_sizes = set(list([i for d in equal_rule_dict for i in d.keys()]))
         # print(f"{rule_sizes=}")
@@ -478,9 +478,10 @@ class FoldMetabolism:
         metadict = {
             "runtime": dict(),
             "freefolds": dict(),
+            "n_rulegroups_in_iteration":dict(),
             "n_rules_checked":dict(),
-            "n_remaining_folds":dict(),
-            "n_rulegroups_in_iteration":dict()
+            "max_n_remaining_folds":dict(),
+            "max_n_remaining_rules":dict()
         }
 
         ## Initialize current values
@@ -501,7 +502,7 @@ class FoldMetabolism:
         ################
         ## ITERATION 0
         ## Avoid updating folds on the 0th iteration since they don't apply until iteration=1
-        iteration_dict = self.update_iteration_dict(iteration_dict, {k:v for k,v in current.items() if k!="folds"}, iteration)
+        iteration_dict = update_iteration_dict(iteration_dict, {k:v for k,v in current.items() if k!="folds"}, iteration)
         iteration+=1
         start = timeit.default_timer()
 
@@ -519,14 +520,15 @@ class FoldMetabolism:
         if free_rules == True: ## Append free_folds to data dict
             current["folds"] = (current["folds"] | free_folds)
         remaining_folds = (self.scope_folds - current["folds"] - free_folds) ## Remove the free folds from the remaining folds regardless
-        iteration_dict = self.update_iteration_dict(iteration_dict, current, iteration)
+        iteration_dict = update_iteration_dict(iteration_dict, current, iteration)
 
         ## Update metadata
         metadict["runtime"][iteration] = timeit.default_timer() - start
         metadict["freefolds"][iteration] = free_folds
-        metadict["n_rules_checked"][iteration] = 0
-        metadict["n_remaining_folds"][iteration] = n_remaining_folds
         metadict["n_rulegroups_in_iteration"][iteration] = 0
+        metadict["n_rules_checked"][iteration] = 0
+        metadict["max_n_remaining_folds"][iteration] = len(remaining_folds)
+        metadict["max_n_remaining_rules"][iteration] = len(self.scope_rules2rn) - len(subset_rule2rn(current["folds"], self.scope_rules2rn))
         print("\nITERATION: ", iteration)
         for k, d in metadict.items():
             if k!="freefolds":
@@ -557,17 +559,6 @@ class FoldMetabolism:
             # print("free folds: ", free_folds)
             remaining_folds = (remaining_folds - set(next_rule) - free_folds)
 
-            ## Update metadata
-            metadict["runtime"][iteration] = timeit.default_timer() - start
-            metadict["freefolds"][iteration] = free_folds
-            metadict["n_rules_checked"][iteration] = n_rules_checked
-            metadict["n_remaining_folds"][iteration] = n_remaining_folds
-            metadict["n_rulegroups_in_iteration"][iteration] = n_equal_rule_groups
-            print("\nITERATION: ", iteration)
-            for k, d in metadict.items():
-                if k!="freefolds":
-                    print(k,": ",d[iteration])
-
             if len(remaining_folds) == 0:
                 keepgoing = False
 
@@ -585,7 +576,19 @@ class FoldMetabolism:
                 current["rns"] = fdata["rns"]
                 
                 ## Store when cpds and rns appear in the expansion
-                iteration_dict = self.update_iteration_dict(iteration_dict, current, iteration)
+                iteration_dict = update_iteration_dict(iteration_dict, current, iteration)
+
+            ## Update metadata
+            metadict["runtime"][iteration] = timeit.default_timer() - start
+            metadict["freefolds"][iteration] = free_folds
+            metadict["n_rulegroups_in_iteration"][iteration] = n_equal_rule_groups
+            metadict["n_rules_checked"][iteration] = n_rules_checked
+            metadict["max_n_remaining_folds"][iteration] = len(remaining_folds)
+            metadict["max_n_remaining_rules"][iteration] = len(self.scope_rules2rn) - len(subset_rule2rn(current["folds"], self.scope_rules2rn))
+            print("\nITERATION: ", iteration)
+            for k, d in metadict.items():
+                if k!="freefolds":
+                    print(k,": ",d[iteration])
 
         return current, iteration_dict, metadict
 
