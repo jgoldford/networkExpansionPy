@@ -171,13 +171,22 @@ class FoldMetabolism:
     def calculate_scope(self, seed_cpds):
         """
         Calculate the scope of the seed_cpds with all reactions enabled by the global fold network (including fold_independent reactions)
+
+        :param seed_cpds: collection of compound ids
+        :return: set of compounds and set of reactions in the scope
         """
         rn_tup_set = set(self._m.rxns2tuple((self._f.rns | self._f.fold_independent_rns)))
         scope_cpds, scope_rns = self._m.expand(seed_cpds, reaction_mask=rn_tup_set)
         return set(scope_cpds), set([i[0] for i in scope_rns])
 
     def folds2rules(self, folds, rules):
-        """Doesn't use self"""
+        """
+        Returns a dictionary of rules:rns enabled by folds
+        
+        :param folds: collection of folds used to subset the rules dict
+        :param rules: dict of rule:rns mappings to subset from
+        :return: dictionary of rules:rns enabled by folds
+        """
         return {k:v for k,v in rules.items() if k <= set(folds)}
             
     def create_foldrules2rn(self, rn2fold):
