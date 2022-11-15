@@ -168,9 +168,9 @@ class GlobalFoldNetwork:
     def __init__(self, rn2rules, fold_independent_rns):
 
         self.rn2rules = rn2rules ## all rns to fold rules
-        self.rules2rn = rule2rn(rn2rules) ## all fold rules to rns
+        self.rule2rns = rule2rn(rn2rules) ## all fold rules to rns
         self.rns = set(rn2rules.keys()) ## reactions in fold network only
-        self.folds = set([i for fs in self.rules2rn.keys() for i in fs]) ## all folds
+        self.folds = set([i for fs in self.rule2rns.keys() for i in fs]) ## all folds
         print("GlobalFoldNetwork initialized\n%i folds available in RUN"%(len(self.folds)))
         self.fold_independent_rns = fold_independent_rns
 
@@ -278,9 +278,9 @@ class FoldMetabolism:
         # print("-> Folds whose rules correspond to reactions which are subsets of one another in the next NEXT ITERATION removed\n-> ... %i folds available for the NEXT ITERATION"%len(filtered_folds_to_expand))
         return equal_rule_dict #filtered_folds_to_expand
 
-    def fold_expand(self, metabolism, folds, rules2rn, fold_independent_rns, cpds):
+    def fold_expand(self, metabolism, folds, rule2rns, fold_independent_rns, cpds):
         """Doesn't use self"""
-        fold_rns = set([i for s in rules2rn.values() for i in s])
+        fold_rns = set([i for s in rule2rns.values() for i in s])
         rn_tup_set = set(metabolism.rxns2tuple(fold_rns | fold_independent_rns))
         cx,rx = metabolism.expand(cpds,reaction_mask=rn_tup_set)
         return set(cx), set([i[0] for i in rx])
@@ -316,7 +316,7 @@ class FoldMetabolism:
                     # only look at first rule among equals
                     rule = d[fsize][0]
                     _fdict = dict()
-                    _fdict["rules2rn"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule(rule, current_folds, current_cpds)
+                    _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule(rule, current_folds, current_cpds)
                     if len(_fdict["rns"] - current_rns) > 0:
                         f_effects[rule] = _fdict
 
