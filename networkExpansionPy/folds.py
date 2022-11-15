@@ -110,7 +110,7 @@ def create_foldrules2rn(rn2fold):
                 fold2rn[fs] = set([rn])
     return fold2rn
 
-def subset_rules2rn(folds, rules):
+def subset_rule2rn(folds, rule2rn):
     """
     Returns a dictionary of rules:rns enabled by folds
     
@@ -118,7 +118,12 @@ def subset_rules2rn(folds, rules):
     :param rules: dict of rule:rns mappings to subset from
     :return: dictionary of rules:rns enabled by folds
     """
-    return {k:v for k,v in rules.items() if k <= set(folds)}
+    return {k:v for k,v in rule2rn.items() if k <= set(folds)}
+
+def rule2rn_enabling_new_rn(current_folds, rule2rn):
+    current_rule2rn = subset_rule2rn(current_folds, rule2rn)
+    current_rns = set([rn for v in current_rule2rn.values() for rn in v])
+    return {k:(v | current_rns) for k,v in rule2rn.items() if not v <= current_rns}
 
 def create_equal_rule_groups(rule2rn):
     """
@@ -224,11 +229,6 @@ class FoldMetabolism:
         scope_cpds, scope_rns = self._m.expand(seed_cpds, reaction_mask=rn_tup_set)
         return set(scope_cpds), set([i[0] for i in scope_rns])
 
-    def filter_next_iter_to_rules_enabling_new_reactions(self, current_folds):
-        current_fold2rn = {k:v for k,v in self.scope_rules2rn.items() if k <= current_folds}
-        current_rns = set([rn for v in current_fold2rn.values() for rn in v])
-        return {k:(v | current_rns) for k,v in self.scope_rules2rn.items() if not v <= current_rns}
-
     def organize_set_elements_by_size(self, myset):
         element_lengths = dict()
         for i in myset:
@@ -263,9 +263,9 @@ class FoldMetabolism:
     def next_iter_possible_rules(self, current_folds):
 
         ## Need to run these two calls every iteration of the fold expansion
-        future_rule2rns = self.filter_next_iter_to_rules_enabling_new_reactions(current_folds)
+        future_rule2rns = rule2rn_enabling_new_rn(current_folds, self.scope_rules2rn)
         print(f"{future_rule2rns=}")
-        equal_rule_groups_that_arent_subsets = self.create_equal_rule_groups(future_rule2rns)
+        equal_rule_groups_that_arent_subsets = create_equal_rule_groups(future_rule2rns)
         equal_rule_dict = self.organize_equal_rule_groups_by_size(self.remove_current_folds_from_equal_rule_groups(current_folds, equal_rule_groups_that_arent_subsets))
 
         # print("-> Folds whose rules correspond to reactions which are subsets of one another in the next NEXT ITERATION removed\n-> ... %i folds available for the NEXT ITERATION"%len(filtered_folds_to_expand))
@@ -285,7 +285,7 @@ class FoldMetabolism:
         """
 
         potential_fold_set = (current_folds | set(rule))
-        potential_rules2rn = subset_rules2rn(potential_fold_set, self.scope_rules2rn)
+        potential_rules2rn = subset_rule2rn(potential_fold_set, self.scope_rules2rn)
         cx,rx = self.fold_expand(self._m, potential_fold_set, potential_rules2rn, self._f.fold_independent_rns, current_cpds)
 
         return potential_rules2rn, cx, rx #set(cx), set(rx)
@@ -370,7 +370,7 @@ class FoldMetabolism:
         # print("current dict INIT: ", current)
 
         ## First expansion (using only seed folds and fold independent reactions)
-        init_rules2rn = subset_rules2rn(current["folds"], self.scope_rules2rn)
+        init_rules2rn = subset_rule2rn(current["folds"], self.scope_rules2rn)
         current["cpds"], current["rns"] = self.fold_expand(self._m, current["folds"], init_rules2rn, self._f.fold_independent_rns, current["cpds"])
         ## Add free folds to current dict
         free_folds = {i for fs in self.free_rules(current["rns"], current["folds"]) for i in fs}
@@ -396,7 +396,7 @@ class FoldMetabolism:
             print("\nITERATION: ", iteration)
             print("maximum n folds remaining: ", len(remaining_folds))
             print("maximum remaining_folds:\n", remaining_folds)
-            print("subset_rules2rn: ", subset_rules2rn(remaining_folds, self.scope_rules2rn))
+            print("subset_rule2rn: ", subset_rule2rn(remaining_folds, self.scope_rules2rn))
             next_rule, fdata = self.select_next_rule(current["folds"], current["cpds"], current["rns"])
             print("next fold: ", next_rule)
             print("fdata:")
