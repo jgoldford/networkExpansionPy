@@ -94,28 +94,33 @@ def fold_expansion(metabolism,foldRules,fold_set,cpds_set,rxns_seed):
 
 ########################################################################################################################
 ########################################################################################################################
+def create_foldrules2rn(rn2fold):
+    """
+    Returns dictionary mapping folds to reactions from a dictionary mapping reactions to folds
+
+    :param rn2fold: dict mapping rns to folds
+    :return: dict mapping folds to rns
+    """
+    fold2rn = dict()
+    for rn, rules in rn2fold.items():
+        for fs in rules:
+            if fs in fold2rn:
+                fold2rn[fs].add(rn)
+            else:
+                fold2rn[fs] = set([rn])
+    return fold2rn
+########################################################################################################################
 
 class GlobalFoldNetwork:
 
     def __init__(self, rn2rules, fold_independent_rns):
 
         self.rn2rules = rn2rules ## all rns to fold rules
-        self.rules2rn = self.create_foldrules2rn(rn2rules) ## all fold rules to rns
+        self.rules2rn = create_foldrules2rn(rn2rules) ## all fold rules to rns
         self.rns = set(rn2rules.keys()) ## reactions in fold network only
         self.folds = set([i for fs in self.rules2rn.keys() for i in fs]) ## all folds
         print("GlobalFoldNetwork initialized\n%i folds available in RUN"%(len(self.folds)))
         self.fold_independent_rns = fold_independent_rns
-
-    def create_foldrules2rn(self, rn2fold):
-        fold2rn = dict()
-        for rn, rules in rn2fold.items():
-            for fs in rules:
-                if fs in fold2rn:
-                    fold2rn[fs].add(rn)
-                else:
-                    fold2rn[fs] = set([rn])
-        return fold2rn
-
 
 class FoldMetabolism:
     """
@@ -160,7 +165,7 @@ class FoldMetabolism:
             self._seed_cpds = seed_cpds 
             self.scope_cpds, self.scope_rns = self.calculate_scope(self._seed_cpds)
             self.scope_rn2rules = {k:v for k,v in self._f.rn2rules.items() if k in self.scope_rns}
-            self.scope_rules2rn = self.create_foldrules2rn(self.scope_rn2rules)
+            self.scope_rules2rn = create_foldrules2rn(self.scope_rn2rules)
             self.scope_folds = set([i for fs in self.scope_rules2rn.keys() for i in fs])
             print("...done.")
             print("Folds in RUN reduced to overlap with scope from fold reactions and fold independent reactions\n%i folds available in RUN"%len(self.scope_folds)) ## scope only includes reactions in folds, and reacitons explicitly input as independent of folds
@@ -188,17 +193,6 @@ class FoldMetabolism:
         :return: dictionary of rules:rns enabled by folds
         """
         return {k:v for k,v in rules.items() if k <= set(folds)}
-            
-    def create_foldrules2rn(self, rn2fold):
-        """Doesn't use self"""
-        fold2rn = dict()
-        for rn, rules in rn2fold.items():
-            for fs in rules:
-                if fs in fold2rn:
-                    fold2rn[fs].add(rn)
-                else:
-                    fold2rn[fs] = set([rn])
-        return fold2rn
 
     def create_k2equalk(self, k2collection):
         """
