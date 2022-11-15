@@ -10,7 +10,7 @@ from collections import Counter
 asset_path = PurePath(__file__).parent / "assets"
 
 # define a function that determins if a reaction rule (x) is feasible with foldSet
-def rule2rn(foldSet,x):
+def singlerule2rn(foldSet,x):
     if x.issubset(foldSet):
     #if foldSet.issubset(x)
         return True
@@ -19,7 +19,7 @@ def rule2rn(foldSet,x):
 
 # define a function that returns a list of reactions that are feasible with foldSet.  rules_sub contains all the fold set rules for all reactions
 def dffolds2rn(rules_sub,foldSet):
-    feasible = rules_sub['fold_sets'].apply(lambda x: rule2rn(foldSet,x))
+    feasible = rules_sub['fold_sets'].apply(lambda x: singlerule2rn(foldSet,x))
     y = rules_sub[feasible]
     if len(y) > 0:
         rns = rules_sub[feasible].rn.unique().tolist()
@@ -29,7 +29,7 @@ def dffolds2rn(rules_sub,foldSet):
 
 # same as above but return only the set of rules that are feasible
 def dffolds2rules(rules_sub,foldSet):
-    feasible = rules_sub['fold_sets'].apply(lambda x: rule2rn(foldSet,x))
+    feasible = rules_sub['fold_sets'].apply(lambda x: singlerule2rn(foldSet,x))
     rule_df = rules_sub[feasible]
     return rule_df
 
@@ -94,21 +94,21 @@ def fold_expansion(metabolism,foldRules,fold_set,cpds_set,rxns_seed):
 
 ########################################################################################################################
 ########################################################################################################################
-def create_foldrules2rn(rn2fold):
+def rule2rn(rn2rule):
     """
-    Returns dictionary mapping folds to reactions from a dictionary mapping reactions to folds
+    Returns dictionary mapping of rule:rns from a dictionary of rn:rules
 
-    :param rn2fold: dict mapping rns to folds
-    :return: dict mapping folds to rns
+    :param rn2rule: dict mapping rns to rules
+    :return: dict mapping rules to rns
     """
-    fold2rn = dict()
-    for rn, rules in rn2fold.items():
+    rule2rn = dict()
+    for rn, rules in rn2rule.items():
         for fs in rules:
-            if fs in fold2rn:
-                fold2rn[fs].add(rn)
+            if fs in rule2rn:
+                rule2rn[fs].add(rn)
             else:
-                fold2rn[fs] = set([rn])
-    return fold2rn
+                rule2rn[fs] = set([rn])
+    return rule2rn
 
 def subset_rule2rn(folds, rule2rn):
     """
@@ -121,6 +121,13 @@ def subset_rule2rn(folds, rule2rn):
     return {k:v for k,v in rule2rn.items() if k <= set(folds)}
 
 def rule2rn_enabling_new_rn(current_folds, rule2rn):
+    """
+    Returns a dictionary of rules:rns only for rules enabling reactions that 
+        are undiscovered by current_folds.
+
+    :param current_folds: collection of folds to compare to
+    :param rule2rn: dict of rule:rns mappings to subset from, and then compare to
+    """
     current_rule2rn = subset_rule2rn(current_folds, rule2rn)
     current_rns = set([rn for v in current_rule2rn.values() for rn in v])
     return {k:(v | current_rns) for k,v in rule2rn.items() if not v <= current_rns}
@@ -161,7 +168,7 @@ class GlobalFoldNetwork:
     def __init__(self, rn2rules, fold_independent_rns):
 
         self.rn2rules = rn2rules ## all rns to fold rules
-        self.rules2rn = create_foldrules2rn(rn2rules) ## all fold rules to rns
+        self.rules2rn = rule2rn(rn2rules) ## all fold rules to rns
         self.rns = set(rn2rules.keys()) ## reactions in fold network only
         self.folds = set([i for fs in self.rules2rn.keys() for i in fs]) ## all folds
         print("GlobalFoldNetwork initialized\n%i folds available in RUN"%(len(self.folds)))
@@ -210,7 +217,7 @@ class FoldMetabolism:
             self._seed_cpds = seed_cpds 
             self.scope_cpds, self.scope_rns = self.calculate_scope(self._seed_cpds)
             self.scope_rn2rules = {k:v for k,v in self._f.rn2rules.items() if k in self.scope_rns}
-            self.scope_rules2rn = create_foldrules2rn(self.scope_rn2rules)
+            self.scope_rules2rn = rule2rn(self.scope_rn2rules)
             self.scope_folds = set([i for fs in self.scope_rules2rn.keys() for i in fs])
             print("...done.")
             print("Folds in RUN reduced to overlap with scope from fold reactions and fold independent reactions\n%i folds available in RUN"%len(self.scope_folds)) ## scope only includes reactions in folds, and reacitons explicitly input as independent of folds
