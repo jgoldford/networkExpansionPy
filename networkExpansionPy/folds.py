@@ -278,11 +278,11 @@ class FoldMetabolism:
         # print("-> Folds whose rules correspond to reactions which are subsets of one another in the next NEXT ITERATION removed\n-> ... %i folds available for the NEXT ITERATION"%len(filtered_folds_to_expand))
         return equal_rule_dict #filtered_folds_to_expand
 
-    def fold_expand(self, metabolism, rule2rns, fold_independent_rns, cpds):
+    def fold_expand(self, rule2rns, cpds):
         """Doesn't use self"""
         fold_rns = set([i for s in rule2rns.values() for i in s])
-        rn_tup_set = set(metabolism.rxns2tuple(fold_rns | fold_independent_rns))
-        cx,rx = metabolism.expand(cpds,reaction_mask=rn_tup_set)
+        rn_tup_set = set(self._m.rxns2tuple(fold_rns | self._f.fold_independent_rns))
+        cx,rx = self._m.expand(cpds, reaction_mask=rn_tup_set)
         return set(cx), set([i[0] for i in rx])
 
     def effect_per_rule(self, rule, current_folds, current_cpds):
@@ -293,7 +293,7 @@ class FoldMetabolism:
 
         potential_fold_set = (current_folds | set(rule))
         potential_rules2rn = subset_rule2rn(potential_fold_set, self.scope_rules2rn)
-        cx,rx = self.fold_expand(self._m, potential_rules2rn, self._f.fold_independent_rns, current_cpds)
+        cx,rx = self.fold_expand(potential_rules2rn, current_cpds)
 
         return potential_rules2rn, cx, rx #set(cx), set(rx)
 
@@ -378,7 +378,7 @@ class FoldMetabolism:
 
         ## First expansion (using only seed folds and fold independent reactions)
         init_rules2rn = subset_rule2rn(current["folds"], self.scope_rules2rn)
-        current["cpds"], current["rns"] = self.fold_expand(self._m, init_rules2rn, self._f.fold_independent_rns, current["cpds"])
+        current["cpds"], current["rns"] = self.fold_expand(init_rules2rn, current["cpds"])
         ## Add free folds to current dict
         free_folds = {i for fs in self.free_rules(current["rns"], current["folds"]) for i in fs}
         print("current folds: ", current["folds"])
