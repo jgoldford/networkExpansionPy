@@ -18,7 +18,7 @@ def rule2rn(foldSet,x):
         return False
 
 # define a function that returns a list of reactions that are feasible with foldSet.  rules_sub contains all the fold set rules for all reactions
-def folds2rn(rules_sub,foldSet):
+def dffolds2rn(rules_sub,foldSet):
     feasible = rules_sub['fold_sets'].apply(lambda x: rule2rn(foldSet,x))
     y = rules_sub[feasible]
     if len(y) > 0:
@@ -28,7 +28,7 @@ def folds2rn(rules_sub,foldSet):
     return rns
 
 # same as above but return only the set of rules that are feasible
-def folds2rules(rules_sub,foldSet):
+def dffolds2rules(rules_sub,foldSet):
     feasible = rules_sub['fold_sets'].apply(lambda x: rule2rn(foldSet,x))
     rule_df = rules_sub[feasible]
     return rule_df
@@ -70,7 +70,7 @@ class FoldRules:
             else:
                 foldSet = set(foldSet)
                 
-        rns = folds2rn(self.rules,foldSet)
+        rns = dffolds2rn(self.rules,foldSet)
         return rns
     
     def removeFolds(self,folds_remove):
