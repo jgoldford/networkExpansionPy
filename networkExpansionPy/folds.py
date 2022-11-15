@@ -233,12 +233,14 @@ def next_iter_possible_rules(self, current_folds, rule2rn):
 
     ## Need to run these two calls every iteration of the fold expansion
     future_rule2rns = rule2rn_enabling_new_rn(current_folds, rule2rn)
-    print(f"{future_rule2rns=}")
     equal_rule_groups = create_equal_rule_groups(future_rule2rns)
     equal_rule_groups = remove_current_folds_from_equal_rule_groups(current_folds, equal_rule_groups)
+    # print(f"{future_rule2rns=}")
     # equal_rule_dict = [rule_sizes(i) for i in equal_rule_groups]
 
-    # print("-> Folds whose rules correspond to reactions which are subsets of one another in the next NEXT ITERATION removed\n-> ... %i folds available for the NEXT ITERATION"%len(filtered_folds_to_expand))
+    print("\tEliminated folds/rules that enable subsets of others' reactions.")
+    print("\t\t%i folds available for the NEXT ITERATION"%len(set([f for g in equal_rule_groups for r in g for f in r])))
+    print("\t\t%i rules available for the NEXT ITERATION"%len(equal_rule_groups))
     return [rule_sizes(i) for i in equal_rule_groups]
 
 def maxreactions(r_effects):
@@ -254,6 +256,18 @@ def maxreactions(r_effects):
     return max(k_vcount, key = k_vcount.get)
 
 def update_iteration_dict(self, iteration_dict, current, iteration):
+    """ 
+    Adds the iteration at which new compounds, reactions, and folds appear
+        throughout the fold/rule expansion.
+
+    :param iteration_dict: existing dictionary containing keys of "cpds", "rns", and "folds"
+                           with values of dictionaries mapping cids, rids, or fids to iteration
+                           e.g. {"cpds":{"C00343":0,...},...}
+    :param current: a dictionary keyed with "cpds", "rns", and "folds", whose values are sets of 
+                    ids that the expansion has reached
+    :param iteration: integer of current expansion iteration
+    :return: updated iteration_dict
+    """
     for dtype, ids in current.items():
         for i in ids:
             if i not in iteration_dict[dtype]:
@@ -269,8 +283,11 @@ class GlobalFoldNetwork:
         self.rule2rns = rule2rn(rn2rules) ## all fold rules to rns
         self.rns = set(rn2rules.keys()) ## reactions in fold network only
         self.folds = set([i for fs in self.rule2rns.keys() for i in fs]) ## all folds
-        print("GlobalFoldNetwork initialized\n%i folds available in RUN"%(len(self.folds)))
         self.fold_independent_rns = fold_independent_rns
+
+        print("GlobalFoldNetwork initialized")
+        print("\n%i folds available in RUN"%(len(self.folds)))
+        print("\n%i rules available in RUN"%(len(self.rule2rns)))
 
 class FoldMetabolism:
     """
@@ -317,8 +334,10 @@ class FoldMetabolism:
             self.scope_rn2rules = {k:v for k,v in self._f.rn2rules.items() if k in self.scope_rns}
             self.scope_rules2rn = rule2rn(self.scope_rn2rules)
             self.scope_folds = set([i for fs in self.scope_rules2rn.keys() for i in fs])
-            print("...done.")
-            print("Folds in RUN reduced to overlap with scope from fold reactions and fold independent reactions\n%i folds available in RUN"%len(self.scope_folds)) ## scope only includes reactions in folds, and reacitons explicitly input as independent of folds
+            print("... done.")
+            print("\tEliminated folds/rules outside of scope or fold independent reactions.") ## scope only includes reactions in folds, and reacitons explicitly input as independent of folds
+            print("\t\t%i folds available in RUN"%len(self.scope_folds))
+            print("\t\t%i rules available in RUN"%len(self.scope_rules2rn))
 
         else:
             pass 
@@ -364,7 +383,7 @@ class FoldMetabolism:
         potential_rule2rns = subset_rule2rn(potential_fold_set, self.scope_rules2rn)
         cx,rx = self.fold_expand(potential_rule2rns, current_cpds)
 
-        return potential_rule2rns, cx, rx #set(cx), set(rx)
+        return potential_rule2rns, cx, rx
 
     def loop_through_rules(self, current_folds, current_cpds, current_rns):
         """
@@ -382,13 +401,13 @@ class FoldMetabolism:
         equal_rule_dict = next_iter_possible_rules(current_folds, self.scope_rule2rn)
 
         rule_sizes = set(list([i for d in equal_rule_dict for i in d.keys()]))
-        print(f"{rule_sizes=}")
-        print(f"{len(equal_rule_dict)=}")
-        print("lens of rules in equal_rule_dict: ", Counter([k for d in equal_rule_dict for k,v in d.items()]))
-        print("n rules remaining: ", len(equal_rule_dict))
-        print("")
-        print(f"{equal_rule_dict=}")
-
+        # print(f"{rule_sizes=}")
+        # print(f"{len(equal_rule_dict)=}")
+        # print("lens of rules in equal_rule_dict: ", Counter([k for d in equal_rule_dict for k,v in d.items()]))
+        # print("n rules remaining: ", len(equal_rule_dict))
+        # print("")
+        # print(f"{equal_rule_dict=}")
+    
         for rsize in sorted(rule_sizes):
             r_effects = dict()
             for d in equal_rule_dict:
