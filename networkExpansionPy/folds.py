@@ -133,6 +133,14 @@ def rule2nextrns(current_folds, rule2rn):
     current_rns = set([rn for v in current_rule2rn.values() for rn in v])
     return {k:(v | current_rns) for k,v in rule2rn.items() if not v <= current_rns}
 
+def sort_equal_rule_groups(equal_rule_groups):
+    # [sorted([sorted(i) for i in group]) for group in equal_groups]
+    equal_rule_groups_sorted = []
+    for ofs in equal_rule_groups:
+        equal_rule_groups_sorted.append(sorted([sorted(ifs) for ifs in ofs]))
+
+    return sorted(equal_rule_groups_sorted)
+
 def create_equal_rule_groups(rule2rn):
     """
     Returns a sorted list of equivilent rule collections.
@@ -158,10 +166,10 @@ def create_equal_rule_groups(rule2rn):
         equal_groups.add(frozenset(equal_ks))
 
     ## exclude groups which include any strict subset rules
-    equal_groups = {i for i in equal_groups if not i & strictsubset_ks}
+    return {i for i in equal_groups if not i & strictsubset_ks}
 
     ## transform to lists of lists of rules for the purposes of sortability/reproducability
-    return [sorted([sorted(i) for i in group]) for group in equal_groups]
+    # return 
 
 def rule_sizes(rule_group):
     """
@@ -235,6 +243,7 @@ def next_iter_possible_rules(current_folds, rule2rn):
     ## Need to run these two calls every iteration of the fold expansion
     future_rule2rns = rule2nextrns(current_folds, rule2rn)
     equal_rule_groups = create_equal_rule_groups(future_rule2rns)
+    equal_rule_groups = sort_equal_rule_groups(equal_rule_groups)
     equal_rule_groups = remove_current_folds_from_equal_rule_groups(current_folds, equal_rule_groups)
     # print(f"{future_rule2rns=}")
     # equal_rule_dict = [rule_sizes(i) for i in equal_rule_groups]
