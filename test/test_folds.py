@@ -125,8 +125,63 @@ class TestIndependentFunctions(unittest.TestCase):
         self.assertEqual(expected, nf.rule2nextrns(folds, rule2rn))
 
     def test_create_equal_rule_groups(self):
-        pass
+        rule2rn = {
+            frozenset({'F12'}): {'R2', 'R0'},
+            frozenset({'F11'}): {'R2', 'R0'},
+            frozenset({'F10','F11'}): {'R0'},
+            frozenset({'F0'}): {'R0'},
+            frozenset({'F1'}): {'R1'},
+            frozenset({'F2'}): {'R2'},
+            frozenset({'F3'}): {'R3'},
+            frozenset({'F4'}): {'R4'},
+            frozenset({'F5'}): {'R5'},
+            frozenset({'F6'}): {'R6'},
+            frozenset({'F7'}): {'R7'},
+            frozenset({'F8'}): {'R8'},
+            frozenset({'F9'}): {'R9'}
+            }
 
+        expected = {
+            frozenset([frozenset({'F11'}),frozenset({'F12'})]),
+            frozenset([frozenset({'F1'})]),
+            frozenset([frozenset({'F3'})]),
+            frozenset([frozenset({'F4'})]),
+            frozenset([frozenset({'F5'})]),
+            frozenset([frozenset({'F6'})]),
+            frozenset([frozenset({'F7'})]),
+            frozenset([frozenset({'F8'})]),
+            frozenset([frozenset({'F9'})])
+        }
+
+        self.assertEqual(expected, nf.create_equal_rule_groups(rule2rn))
+
+    def test_sort_equal_rule_groups(self):
+
+        equal_rule_groups = {
+            frozenset([frozenset({'F11'}),frozenset({'F12'})]),
+            frozenset([frozenset({'F1'})]),
+            frozenset([frozenset({'F3'})]),
+            frozenset([frozenset({'F4'})]),
+            frozenset([frozenset({'F5'})]),
+            frozenset([frozenset({'F6'})]),
+            frozenset([frozenset({'F7'})]),
+            frozenset([frozenset({'F8'})]),
+            frozenset([frozenset({'F9'})])
+        }
+
+        expected = [
+            [['F1']],
+            [['F11'], ['F12']],
+            [['F3']],
+            [['F4']],
+            [['F5']],
+            [['F6']],
+            [['F7']],
+            [['F8']],
+            [['F9']]
+        ]
+
+        self.assertEqual(expected, nf.sort_equal_rule_groups(equal_rule_groups))
 
 # class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
 
