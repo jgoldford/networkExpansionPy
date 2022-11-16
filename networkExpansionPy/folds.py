@@ -335,9 +335,9 @@ class FoldMetabolism:
             self.scope_rules2rn = rule2rn(self.scope_rn2rules)
             self.scope_folds = set([i for fs in self.scope_rules2rn.keys() for i in fs])
             print("... done.")
-            print("\tEliminated folds/rules outside of scope or fold independent reactions.") ## scope only includes reactions in folds, and reacitons explicitly input as independent of folds
-            print("\t\t%i folds available in RUN"%len(self.scope_folds))
-            print("\t\t%i rules available in RUN"%len(self.scope_rules2rn))
+            # print("\tEliminated folds/rules outside of scope or fold independent reactions.") ## scope only includes reactions in folds, and reacitons explicitly input as independent of folds
+            # print("\t\t%i folds available in RUN"%len(self.scope_folds))
+            # print("\t\t%i rules available in RUN"%len(self.scope_rules2rn))
 
         else:
             pass 
@@ -529,10 +529,10 @@ class FoldMetabolism:
         metadict["n_rules_checked"][iteration] = 0
         metadict["max_n_remaining_folds"][iteration] = len(remaining_folds)
         metadict["max_n_remaining_rules"][iteration] = len(self.scope_rules2rn) - len(subset_rule2rn(current["folds"], self.scope_rules2rn))
-        print("\nITERATION: ", iteration)
-        for k, d in metadict.items():
-            if k!="freefolds":
-                print(k,": ",d[iteration])
+        # print("\nITERATION: ", iteration)
+        # for k, d in metadict.items():
+        #     if k!="freefolds":
+        #         print(k,": ",d[iteration])
 
         ## Needed in case expansion not possible at all
         if len(remaining_folds) > 0:
@@ -585,10 +585,10 @@ class FoldMetabolism:
             metadict["n_rules_checked"][iteration] = n_rules_checked
             metadict["max_n_remaining_folds"][iteration] = len(remaining_folds)
             metadict["max_n_remaining_rules"][iteration] = len(self.scope_rules2rn) - len(subset_rule2rn(current["folds"], self.scope_rules2rn))
-            print("\nITERATION: ", iteration)
-            for k, d in metadict.items():
-                if k!="freefolds":
-                    print(k,": ",d[iteration])
+            # print("\nITERATION: ", iteration)
+            # for k, d in metadict.items():
+            #     if k!="freefolds":
+            #         print(k,": ",d[iteration])
 
         return current, iteration_dict, metadict
 
