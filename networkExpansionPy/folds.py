@@ -120,10 +120,11 @@ def subset_rule2rn(folds, rule2rn):
     """
     return {k:v for k,v in rule2rn.items() if k <= set(folds)}
 
-def rule2rn_enabling_new_rn(current_folds, rule2rn):
+def rule2nextrns(current_folds, rule2rn):
     """
     Returns a dictionary of rules:rns only for rules enabling reactions that 
-        are undiscovered by current_folds.
+        are undiscovered by current_folds. Each rule will map to all reactions
+        enabled after that rule is added.
 
     :param current_folds: collection of folds to compare to
     :param rule2rn: dict of rule:rns mappings to subset from, and then compare to
@@ -232,7 +233,7 @@ def next_iter_possible_rules(current_folds, rule2rn):
     """
 
     ## Need to run these two calls every iteration of the fold expansion
-    future_rule2rns = rule2rn_enabling_new_rn(current_folds, rule2rn)
+    future_rule2rns = rule2nextrns(current_folds, rule2rn)
     equal_rule_groups = create_equal_rule_groups(future_rule2rns)
     equal_rule_groups = remove_current_folds_from_equal_rule_groups(current_folds, equal_rule_groups)
     # print(f"{future_rule2rns=}")

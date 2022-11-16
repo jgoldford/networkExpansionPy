@@ -6,7 +6,7 @@ from scipy.sparse import csr_matrix
 from pprint import pprint
 # from pandas.testing import assert_frame_equal
 
-class TestRule2Rn(unittest.TestCase):
+class TestIndependentFunctions(unittest.TestCase):
 
     maxDiff = None
 
@@ -41,6 +41,92 @@ class TestRule2Rn(unittest.TestCase):
             }
 
         self.assertEqual(expected_rule2rns, nf.rule2rn(rn2rules))
+
+    def test_subset_rule2rn(self):
+        
+        rule2rn = {
+            frozenset({'F12'}): {'R2', 'R0'},
+            frozenset({'F11'}): {'R2', 'R0'},
+            frozenset({'F10','F11'}): {'R0'},
+            frozenset({'F0'}): {'R0'},
+            frozenset({'F1'}): {'R1'},
+            frozenset({'F2'}): {'R2'},
+            frozenset({'F3'}): {'R3'},
+            frozenset({'F4'}): {'R4'},
+            frozenset({'F5'}): {'R5'},
+            frozenset({'F6'}): {'R6'},
+            frozenset({'F7'}): {'R7'},
+            frozenset({'F8'}): {'R8'},
+            frozenset({'F9'}): {'R9'}
+            }
+
+
+        folds = {'F10'}
+        expected = {}
+        self.assertEqual(expected, nf.subset_rule2rn(folds, rule2rn))
+
+        folds = {'F10','F11'}
+        expected = {
+            frozenset({'F11'}): {'R2', 'R0'}, 
+            frozenset({'F10','F11'}): {'R0'}
+            }
+        self.assertEqual(expected, nf.subset_rule2rn(folds, rule2rn))
+
+        folds = {'F9','F11'}
+        expected = {
+            frozenset({'F11'}): {'R2', 'R0'}, 
+            frozenset({'F9'}): {'R9'}
+            }
+        self.assertEqual(expected, nf.subset_rule2rn(folds, rule2rn))
+
+    def test_rule2nextrns(self):
+
+        rule2rn = {
+            frozenset({'F12'}): {'R2', 'R0'},
+            frozenset({'F11'}): {'R2', 'R0'},
+            frozenset({'F10','F11'}): {'R0'},
+            frozenset({'F0'}): {'R0'},
+            frozenset({'F1'}): {'R1'},
+            frozenset({'F2'}): {'R2'},
+            frozenset({'F3'}): {'R3'},
+            frozenset({'F4'}): {'R4'},
+            frozenset({'F5'}): {'R5'},
+            frozenset({'F6'}): {'R6'},
+            frozenset({'F7'}): {'R7'},
+            frozenset({'F8'}): {'R8'},
+            frozenset({'F9'}): {'R9'}
+            }
+
+        folds = {'F0'}
+        expected = {
+            frozenset({'F12'}): {'R2', 'R0'},
+            frozenset({'F11'}): {'R2', 'R0'},
+            frozenset({'F1'}): {'R1','R0'},
+            frozenset({'F2'}): {'R2','R0'},
+            frozenset({'F3'}): {'R3','R0'},
+            frozenset({'F4'}): {'R4','R0'},
+            frozenset({'F5'}): {'R5','R0'},
+            frozenset({'F6'}): {'R6','R0'},
+            frozenset({'F7'}): {'R7','R0'},
+            frozenset({'F8'}): {'R8','R0'},
+            frozenset({'F9'}): {'R9','R0'}
+            }
+
+        self.assertEqual(expected, nf.rule2nextrns(folds, rule2rn))
+
+        folds = {'F0', 'F1','F2','F3','F4','F5'}
+        expected = {
+            frozenset({'F6'}): {'R6','R0','R1','R2','R3','R4','R5'},
+            frozenset({'F7'}): {'R7','R0','R1','R2','R3','R4','R5'},
+            frozenset({'F8'}): {'R8','R0','R1','R2','R3','R4','R5'},
+            frozenset({'F9'}): {'R9','R0','R1','R2','R3','R4','R5'}
+            }
+
+        self.assertEqual(expected, nf.rule2nextrns(folds, rule2rn))
+
+    def test_create_equal_rule_groups(self):
+        pass
+
 
 # class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
 
