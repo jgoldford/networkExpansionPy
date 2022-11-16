@@ -3,9 +3,12 @@ import networkExpansionPy.lib as ne
 import networkExpansionPy.folds as nf
 import pandas as pd
 from scipy.sparse import csr_matrix
+from pprint import pprint
 # from pandas.testing import assert_frame_equal
 
 class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
+
+    maxDiff = None ## allows full output of failed test differences
 
     def setUp(self):
         reactions = 10
@@ -43,7 +46,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
     def test_GlobalFoldNetwork_create_foldrules2rn(self):
         fold_independent_rns = set()
         foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
-        expected_rules2rn = {frozenset({'F0'}): {'R0'},
+        expected_rule2rns = {frozenset({'F0'}): {'R0'},
                         frozenset({'F1'}): {'R1'},
                         frozenset({'F2'}): {'R2'},
                         frozenset({'F3'}): {'R3'},
@@ -53,9 +56,9 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                         frozenset({'F7'}): {'R7'},
                         frozenset({'F8'}): {'R8'},
                         frozenset({'F9'}): {'R9'}}
-        self.assertEqual(foldnet.rules2rn, expected_rules2rn)
+        self.assertEqual(foldnet.rule2rns, expected_rule2rns)
 
-    def test_FoldMetabolism_fold_order_C0_no_indepdendent(self):
+    def test_FoldMetabolism_rule_order_C0_no_indepdendent(self):
         fold_independent_rns = set()
         foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
         fm = nf.FoldMetabolism(self.met, foldnet)
@@ -86,7 +89,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                                 'R9': {frozenset({'F9'})}}
         self.assertEqual(fm.scope_rn2rules, expected_scope_rn2rules)
 
-        current, iteration_dict = fm.fold_order()
+        current, iteration_dict, metadict = fm.rule_order()
         expected_current = {'folds': {'F0', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'},
                             'cpds': {'C0', 'C1', 'C10', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9'},
                             'rns': {'R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9'}}
@@ -127,7 +130,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         self.assertEqual(iteration_dict, expected_iteration_dict)
         self.assertEqual(current, expected_current)
         
-    def test_FoldMetabolism_fold_order_C0_independent_R0R1(self):
+    def test_FoldMetabolism_rule_order_C0_independent_R0R1(self):
         fold_independent_rns = set(["R0","R1"])
         foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
         fm = nf.FoldMetabolism(self.met, foldnet)
@@ -158,7 +161,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                                 'R9': {frozenset({'F9'})}}
         self.assertEqual(fm.scope_rn2rules, expected_scope_rn2rules)
 
-        current, iteration_dict = fm.fold_order()
+        current, iteration_dict, metadict = fm.rule_order()
         expected_current = {'folds': {'F0', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'},
                             'cpds': {'C0', 'C1', 'C10', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9'},
                             'rns': {'R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9'}}
@@ -196,7 +199,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                                 'F8': 10,
                                 'F9': 11}}
 
-    def test_FoldMetabolism_fold_order_C0_independent_R3R5(self):
+    def test_FoldMetabolism_rule_order_C0_independent_R3R5(self):
         fold_independent_rns = set(["R3","R5"])
         foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
         fm = nf.FoldMetabolism(self.met, foldnet)
@@ -227,7 +230,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                                 'R9': {frozenset({'F9'})}}
         self.assertEqual(fm.scope_rn2rules, expected_scope_rn2rules)
 
-        current, iteration_dict = fm.fold_order()
+        current, iteration_dict, metadict = fm.rule_order()
         expected_current = {'folds': {'F0', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'},
                             'cpds': {'C0', 'C1', 'C10', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9'},
                             'rns': {'R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9'}}
@@ -265,7 +268,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                                 'F8': 10,
                                 'F9': 11}}
 
-    def test_FoldMetabolism_fold_order_C5_no_independent(self):
+    def test_FoldMetabolism_rule_order_C5_no_independent(self):
         fold_independent_rns = set()
         foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
         fm = nf.FoldMetabolism(self.met, foldnet)
@@ -286,7 +289,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                                 'R9': {frozenset({'F9'})}}
         self.assertEqual(fm.scope_rn2rules, expected_scope_rn2rules)
 
-        current, iteration_dict = fm.fold_order()
+        current, iteration_dict, metadict = fm.rule_order()
         expected_current = {'folds': {'F5', 'F6', 'F7', 'F8', 'F9'},
                             'cpds': {'C10', 'C5', 'C6', 'C7', 'C8', 'C9'},
                             'rns': {'R5', 'R6', 'R7', 'R8', 'R9'}}
@@ -346,7 +349,7 @@ class TestGlobalFoldNetworkReversible(unittest.TestCase):
         self.met = ne.GlobalMetabolicNetwork(metabolism="dev")
         self.met.network = self.network
 
-    def test_FoldMetabolism_fold_order_C0_reversible(self):
+    def test_FoldMetabolism_rule_order_C0_reversible(self):
         fold_independent_rns = set()
         foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
         fm = nf.FoldMetabolism(self.met, foldnet)
@@ -377,7 +380,7 @@ class TestGlobalFoldNetworkReversible(unittest.TestCase):
                                 'R9': {frozenset({'F9'})}}
         self.assertEqual(fm.scope_rn2rules, expected_scope_rn2rules)
 
-        current, iteration_dict = fm.fold_order()
+        current, iteration_dict, metadict = fm.rule_order()
         expected_current = {'folds': {'F0', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'},
                             'cpds': {'C0', 'C1', 'C10', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9'},
                             'rns': {'R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9'}}
@@ -418,7 +421,7 @@ class TestGlobalFoldNetworkReversible(unittest.TestCase):
         self.assertEqual(iteration_dict, expected_iteration_dict)
         self.assertEqual(current, expected_current)
 
-    def test_FoldMetabolism_fold_order_C5_reversible(self):
+    def test_FoldMetabolism_rule_order_C5_reversible(self):
         fold_independent_rns = set([])
         foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
         fm = nf.FoldMetabolism(self.met, foldnet)
@@ -449,7 +452,7 @@ class TestGlobalFoldNetworkReversible(unittest.TestCase):
                                 'R9': {frozenset({'F9'})}}
         self.assertEqual(fm.scope_rn2rules, expected_scope_rn2rules)
 
-        current, iteration_dict = fm.fold_order()
+        current, iteration_dict, metadict = fm.rule_order()
         expected_current = {'folds': {'F0', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'},
                             'cpds': {'C0', 'C1', 'C10', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9'},
                             'rns': {'R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9'}}
@@ -525,7 +528,7 @@ class TestGlobalFoldNetworkTwoFoldsSimultaneouslyNeeded(unittest.TestCase):
         self.met = ne.GlobalMetabolicNetwork(metabolism="dev")
         self.met.network = self.network
 
-    def test_FoldMetabolism_fold_order_R0_needs_2_folds(self):
+    def test_FoldMetabolism_rule_order_R0_needs_2_folds(self):
         fold_independent_rns = set([])
         foldnet = nf.GlobalFoldNetwork(self.rn2rules, fold_independent_rns)
         fm = nf.FoldMetabolism(self.met, foldnet)
