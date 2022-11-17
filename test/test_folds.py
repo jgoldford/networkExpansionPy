@@ -230,6 +230,62 @@ class TestIndependentFunctions(unittest.TestCase):
             ]
         self.assertEqual(expected, nf.remove_current_folds_from_equal_rule_groups(current_folds, rule_groups))
 
+    def test_next_iter_possible_rules(self):
+
+        current_folds = {'F3','F11'}
+        rule2rn = {
+            frozenset({'F12'}): {'R2', 'R0'},
+            frozenset({'F11'}): {'R2', 'R0'},
+            frozenset({'F10','F11'}): {'R0'},
+            frozenset({'F0'}): {'R0'},
+            frozenset({'F1'}): {'R1'},
+            frozenset({'F2'}): {'R2'},
+            frozenset({'F3'}): {'R3'},
+            frozenset({'F4'}): {'R4'},
+            frozenset({'F5'}): {'R5'},
+            frozenset({'F6'}): {'R6'},
+            frozenset({'F7'}): {'R7'},
+            frozenset({'F8'}): {'R8'},
+            frozenset({'F9'}): {'R9'}
+            }
+        expected = [
+            {1:[frozenset({'F1'})]},
+            {1:[frozenset({'F4'})]},
+            {1:[frozenset({'F5'})]},
+            {1:[frozenset({'F6'})]},
+            {1:[frozenset({'F7'})]},
+            {1:[frozenset({'F8'})]},
+            {1:[frozenset({'F9'})]},
+        ]
+        self.assertEqual(expected, nf.next_iter_possible_rules(current_folds, rule2rn))
+
+        current_folds = {'F10'}
+        expected = [
+            {1:[frozenset({'F1'})]},
+            {1:[frozenset({'F11'}), frozenset({'F12'})]}, ## F11 and F12 enable equivilent rxn sets
+            {1:[frozenset({'F3'})]},
+            {1:[frozenset({'F4'})]},
+            {1:[frozenset({'F5'})]},
+            {1:[frozenset({'F6'})]},
+            {1:[frozenset({'F7'})]},
+            {1:[frozenset({'F8'})]},
+            {1:[frozenset({'F9'})]},
+        ]
+        ## F0 and F2 enable only subsets of F11 and F12 so are excluded
+        self.assertEqual(expected, nf.next_iter_possible_rules(current_folds, rule2rn))
+
+    def test_maxreactions(self):
+        r_effects = {
+            frozenset({'F1'}):{"rns":[1,2,3,4,5]},
+            frozenset({'F1','F3'}):{"rns":[1,2,3,4,5,4,1,2,3,4,]},
+            frozenset({'F90'}):{"rns":[1,2]}
+        }
+
+        self.assertEqual(frozenset({'F1','F3'}), nf.maxreactions(r_effects))
+
+    def test_update_iteration_dict(self):
+        ## skip testing for now
+        pass
 
 # class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
 
