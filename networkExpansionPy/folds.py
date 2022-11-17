@@ -200,10 +200,10 @@ class FoldMetabolism:
     A re-write of FoldMetabolism to handle doing network expansion with folds
     """
 
-    def __init__(self, metabolism, foldnet, preexpansion=False):
+    def __init__(self, metabolism, foldrules, preexpansion=False):
         # load the data
         self._m = metabolism ## Metabolism object
-        self._f = foldnet
+        self._f = foldrules
 
         self.seed_folds = None
         self._seed_cpds = None
@@ -214,13 +214,21 @@ class FoldMetabolism:
         self.scope_rules2rn = None
         self.scope_rn2rules = None
 
-    ## Disallow changing metabolism or foldnet after initialization b/c no setter
+    ## Disallow changing metabolism or foldrules after initialization b/c no setter
     @property 
     def metabolism(self):
         return self._m
     
     @property 
-    def foldnet(self):
+    def m(self):
+        return self._m
+    
+    @property 
+    def foldrules(self):
+        return self._f
+    
+    @property 
+    def f(self):
         return self._f
 
     ## Changing the seed_cpds after initializations recalcuates scope properties
@@ -237,7 +245,7 @@ class FoldMetabolism:
             print("Seed compounds updated. Calculating seed's scope (this is only done once) ... ")
             self._seed_cpds = seed_cpds 
             self.scope_cpds, self.scope_rns = self.calculate_scope(self._seed_cpds)
-            self.scope_rn2rules = {k:v for k,v in self._f.rn2rules.items() if k in self.scope_rns}
+            self.scope_rn2rules = {k:v for k,v in self.f.rn2rules.items() if k in self.scope_rns}
             self.scope_rules2rn = rule2rn(self.scope_rn2rules)
             self.scope_folds = set([i for fs in self.scope_rules2rn.keys() for i in fs])
             print("... done.")
@@ -255,8 +263,8 @@ class FoldMetabolism:
         :param seed_cpds: collection of compound ids
         :return: set of compounds and set of reactions in the scope
         """
-        rn_tup_set = set(self._m.rxns2tuple((self._f.rns | self._f.fold_independent_rns)))
-        scope_cpds, scope_rns = self._m.expand(seed_cpds, reaction_mask=rn_tup_set)
+        rn_tup_set = set(self.m.rxns2tuple((self.f.rns | self.f.fold_independent_rns)))
+        scope_cpds, scope_rns = self.m.expand(seed_cpds, reaction_mask=rn_tup_set)
         return set(scope_cpds), set([i[0] for i in scope_rns])
 
     def fold_expand(self, rule2rns, cpds):
@@ -269,8 +277,8 @@ class FoldMetabolism:
         :return: set of compounds and set of reactions from the expansion
         """
         fold_rns = set([i for s in rule2rns.values() for i in s])
-        rn_tup_set = set(self._m.rxns2tuple(fold_rns | self._f.fold_independent_rns))
-        cx,rx = self._m.expand(cpds, reaction_mask=rn_tup_set)
+        rn_tup_set = set(self.m.rxns2tuple(fold_rns | self.f.fold_independent_rns))
+        cx,rx = self.m.expand(cpds, reaction_mask=rn_tup_set)
         return set(cx), set([i[0] for i in rx])
 
     def effect_per_rule(self, rule, current_folds, current_cpds):
@@ -500,19 +508,26 @@ class FoldMetabolism:
 
 def example_main():
     ## Load metabolism
-    metabolism_fpath = PurePath(asset_path) / "metabolic_networks" / 'metabolism.23Aug2022.pkl'
-    metabolism = pd.read_pickle(metabolism_fpath)
+    metabolism_path = PurePath(asset_path) / "metabolic_networks" / 'metabolism.23Aug2022.pkl'
+    metabolism = pd.read_pickle(metabolism_path)
     
     ## Load fold rules
-    rn2rules_db = pd.read_pickle(PurePath("data", "rn2fold", "_db.pkl"))
+    rn2rules_db_path = PurePath("data", "rn2fold", "_db.pkl")
+    rn2rules_db = pd.read_pickle(rn2rules_db_path)
+
     rn2rules_path = rn2rules_db.iloc[4]["OUTPUT_PATH"]
     rn2rules = pd.read_pickle(rn2rules_path)
+
     fold_independent_rns = set()
     foldrules = nf.FoldRules(rn2rules, fold_independent_rns)
 
     ## Inititalize fold metabolism
     fm = nf.FoldMetabolism(metabolism, foldrules)
-    fm.seed_cpds = set((pd.read_csv("data/josh/seed_set.csv")["ID"]))
+
+    seed_cpds_path = PurePath("data", "josh", "seed_set.csv")
+    fm.seed_cpds = set((pd.read_csv(seed_cpds_path)["ID"]))
     fm.seed_folds = set(['spontaneous'])
 
+    ## Run fold expansion
     current, iteration_dict, metadict = fm.rule_order()
+    
