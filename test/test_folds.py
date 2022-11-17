@@ -183,6 +183,54 @@ class TestIndependentFunctions(unittest.TestCase):
 
         self.assertEqual(expected, nf.sort_equal_rule_groups(equal_rule_groups))
 
+    def test_rule_sizes(self):
+        ## LEFT OFF HERE
+        self.assertEqual({1:[['F1']]}, nf.rule_sizes([['F1']]))
+        self.assertEqual({2:[['F1','F2']]}, nf.rule_sizes([['F1','F2']]))
+        self.assertEqual({1:[['F2']], 2:[['F1','F2']]}, nf.rule_sizes([['F1','F2'],['F2']]))
+
+    def test_remove_current_folds_from_equal_rule_groups(self):
+
+        rule_groups = [
+            [['F1']],
+            [['F11'], ['F12']],
+            [['F2','F3']],
+            [['F4']],
+            [['F5']],
+            [['F6']],
+            [['F7']],
+            [['F8']],
+            [['F9']]
+        ]
+
+        current_folds = {'F1'}
+        expected = [
+            [frozenset({'F11'}), frozenset({'F12'})],
+            [frozenset({'F3', 'F2'})],
+            [frozenset({'F4'})],
+            [frozenset({'F5'})],
+            [frozenset({'F6'})],
+            [frozenset({'F7'})],
+            [frozenset({'F8'})],
+            [frozenset({'F9'})]
+            ]
+        self.assertEqual(expected, nf.remove_current_folds_from_equal_rule_groups(current_folds, rule_groups))
+
+        current_folds = {'F2','F11'}
+        expected = [
+            [frozenset({'F1'})],
+            [frozenset({'F12'})],
+            [frozenset({'F3'})],
+            [frozenset({'F4'})],
+            [frozenset({'F5'})],
+            [frozenset({'F6'})],
+            [frozenset({'F7'})],
+            [frozenset({'F8'})],
+            [frozenset({'F9'})]
+            ]
+        self.assertEqual(expected, nf.remove_current_folds_from_equal_rule_groups(current_folds, rule_groups))
+
+
 # class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
 
 #     maxDiff = None ## allows full output of failed test differences
