@@ -1,14 +1,10 @@
-from operator import index
-import numpy as np
 import pandas as pd
 from pathlib import PurePath, Path
-from copy import copy, deepcopy
+from copy import deepcopy
 import timeit
 from pprint import pprint
 from collections import Counter
 
-########################################################################################################################
-########################################################################################################################
 def rule2rn(rn2rule):
     """
     Returns dictionary mapping of rule:rns from a dictionary of rn:rules
@@ -106,22 +102,6 @@ def rule_sizes(rule_group):
             element_lengths[l].append(i)
     return element_lengths
 
-
-## SHOULD JUST GET RID OF THIS FUNC SINCE I MADE IT A ONE LINER
-# def organize_equal_rule_groups_by_size(listoflists):
-#     """ 
-#     Returns a list of dictionaries. Each dictionary contains equivilent rules, organized by their sizes.
-
-#     :param listoflists: a collection of equivilent rule groups
-#     :return: a list of equivilent rule groups dictionaries, where the dictionaries are keyed by rule group size
-#     """
-#     ## each inner list should turn into a dict organized by size
-#     # outer_list = []
-#     # for i in listoflists:
-#     #     outer_list.append(rule_sizes(i))
-#     # return outer_list
-#     return [rule_sizes(i) for i in listoflists]
-
 def remove_current_folds_from_equal_rule_groups(current_folds, rule_groups):
     """ 
     Returns a list of rule groups with current folds removed.
@@ -202,8 +182,9 @@ def update_iteration_dict(iteration_dict, current, iteration):
             if i not in iteration_dict[dtype]:
                 iteration_dict[dtype][i] = iteration
     return iteration_dict
-########################################################################################################################
 
+########################################################################################################################
+########################################################################################################################
 class GlobalFoldNetwork:
 
     def __init__(self, rn2rules, fold_independent_rns):
@@ -213,10 +194,6 @@ class GlobalFoldNetwork:
         self.rns = set(rn2rules.keys()) ## reactions in fold network only
         self.folds = set([i for fs in self.rule2rns.keys() for i in fs]) ## all folds
         self.fold_independent_rns = fold_independent_rns
-
-        print("GlobalFoldNetwork initialized\n")
-        print("%i folds available in RUN"%(len(self.folds)))
-        print("%i rules available in RUN"%(len(self.rule2rns)))
 
 class FoldMetabolism:
     """
