@@ -5,6 +5,8 @@ import timeit
 from pprint import pprint
 from collections import Counter
 
+asset_path = PurePath(__file__).parent / "assets"
+
 def rule2rn(rn2rule):
     """
     Returns dictionary mapping of rule:rns from a dictionary of rn:rules
