@@ -224,7 +224,7 @@ def remove_current_folds_from_equal_rule_groups(current_folds, rule_groups):
         # this construction allows us to preserve the ordering from create_equal_rule_groups
         for i in rg:
             new_rule = frozenset(i) - current_folds
-            if len(i) > 0:
+            if len(new_rule) > 0:
                 new_group.append(new_rule)
         if len(new_group) > 0:
             new_rule_groups.append(new_group)
