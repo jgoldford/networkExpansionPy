@@ -185,7 +185,7 @@ def update_iteration_dict(iteration_dict, current, iteration):
 
 ########################################################################################################################
 ########################################################################################################################
-class GlobalFoldNetwork:
+class FoldRules:
 
     def __init__(self, rn2rules, fold_independent_rns):
 
@@ -504,14 +504,14 @@ def example_main():
     metabolism = pd.read_pickle(metabolism_fpath)
     
     ## Load fold rules
-    fold_rules_db = pd.read_pickle(PurePath("data", "rn2fold", "_db.pkl"))
-    fold_rules_path = fold_rules_db.iloc[4]["OUTPUT_PATH"]
-    rn2rules = pd.read_pickle(fold_rules_path)
+    rn2rules_db = pd.read_pickle(PurePath("data", "rn2fold", "_db.pkl"))
+    rn2rules_path = rn2rules_db.iloc[4]["OUTPUT_PATH"]
+    rn2rules = pd.read_pickle(rn2rules_path)
     fold_independent_rns = set()
-    foldnet = nf.GlobalFoldNetwork(rn2rules, fold_independent_rns)
+    foldrules = nf.FoldRules(rn2rules, fold_independent_rns)
 
     ## Inititalize fold metabolism
-    fm = nf.FoldMetabolism(metabolism, foldnet)
+    fm = nf.FoldMetabolism(metabolism, foldrules)
     fm.seed_cpds = set((pd.read_csv("data/josh/seed_set.csv")["ID"]))
     fm.seed_folds = set(['spontaneous'])
 
