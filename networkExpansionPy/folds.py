@@ -186,8 +186,19 @@ def update_iteration_dict(iteration_dict, current, iteration):
 ########################################################################################################################
 ########################################################################################################################
 class FoldRules:
+    """
+    Stores how fold rules and reactions map to each other, and which reactions are independent of folds.
+
+    Invariant to seed compounds, seed folds, etc. This is the universe of possible fold rules. 
+    """
 
     def __init__(self, rn2rules, fold_independent_rns):
+        """
+        Construct fold rules from an `rn2rules` dictionary, and a set of `fold_independent_rns`.
+
+        :param rn2rules: dict of rn:{rules}, where rules are frozensets of folds
+        :param fold_independent_rns: a set of reactions which can occur without folds
+        """
 
         self.rn2rules = rn2rules ## all rns to fold rules
         self.rule2rns = rule2rn(rn2rules) ## all fold rules to rns
@@ -196,14 +207,22 @@ class FoldRules:
         self.fold_independent_rns = fold_independent_rns
 
 class FoldMetabolism:
+    ## Rename to something like FoldScope?
     """
-    A re-write of FoldMetabolism to handle doing network expansion with folds
+    A class to do fold expansion from a metabolism, foldrules, and seeds.
     """
 
     def __init__(self, metabolism, foldrules, preexpansion=False):
-        # load the data
-        self._m = metabolism ## Metabolism object
-        self._f = foldrules
+        """
+        Calculates expansion scope after seed compounds are defined. 
+
+        :param metabolism: a GlobalMetabolicNetwork object that defines the compound/reaction rules of network expansion
+        :param foldrules: a FoldRules object that defines the fold rules of fold expansion
+        :kwarg preexpansion: NOT YET IMPLEMENTED -- but the idea is to allow n steps of regular network expansion before beginning fold expansion
+        """
+        
+        self._m = metabolism ## GlobalMetabolicNetwork object
+        self._f = foldrules # FoldRules object
 
         self.seed_folds = None
         self._seed_cpds = None
