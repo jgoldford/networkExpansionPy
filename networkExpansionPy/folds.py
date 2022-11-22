@@ -395,11 +395,11 @@ class FoldMetabolism:
         next_rule = rselect_func(r_effects)
         return next_rule, r_effects[next_rule], n_rules_checked, n_equal_rule_groups
     
-    def rule_order(self, free_rules=True):
+    def rule_order(self, track_free_rules=True):
         """
         Determine the ordering of all rules/folds.
 
-        :kwarg free_rules: if True, add rules/folds to the iteration_dict that
+        :kwarg track_free_rules: if True, add rules/folds to the iteration_dict that
                            weren't selected, but whose reactions are all
                            already enabled.
 
@@ -447,7 +447,7 @@ class FoldMetabolism:
         current["cpds"], current["rns"] = self.fold_expand(init_rules2rn, current["cpds"])
         ## Add free folds to current dict
         free_folds = {i for fs in free_rules(current["folds"], self.scope_rules2rn) for i in fs}
-        if free_rules == True: ## Append free_folds to data dict
+        if track_free_rules == True: ## Append free_folds to data dict
             current["folds"] = (current["folds"] | free_folds)
         remaining_folds = (self.scope_folds - current["folds"] - free_folds) ## Remove the free folds from the remaining folds regardless
         iteration_dict = update_iteration_dict(iteration_dict, current, iteration)
@@ -465,6 +465,9 @@ class FoldMetabolism:
         else:
             keepgoing = False
 
+        ## Could it be that there could still be remaining_folds here, yet when we go to select the next rule, none of the folds
+        ##      add new reactions? But if this was the case, shouldn't all of those folds be discovered via the free_rules() func?
+
         # print(f'{free_folds = }')
         # print(f'{remaining_folds = }')
         remaining_rules = {k:v for k,v in self.scope_rules2rn.items() if k not in subset_rule2rn(current["folds"], self.scope_rules2rn)}
@@ -475,7 +478,9 @@ class FoldMetabolism:
         while keepgoing:
             start = timeit.default_timer()
             iteration += 1
-            # print(f'{iteration = }')
+            print("rule_order iteration: ", iteration)
+            for k,v in metadict.items():
+                print(k, v)
             next_rule, fdata, n_rules_checked, n_equal_rule_groups = self.select_next_rule(current["folds"], current["cpds"], current["rns"])
             free_folds = {i for fs in free_rules((current["folds"] | set(next_rule)), self.scope_rules2rn) for i in fs}
             remaining_folds = (remaining_folds - set(next_rule) - free_folds)
@@ -487,7 +492,7 @@ class FoldMetabolism:
                 keepgoing = False    
             else:
                 ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
-                if free_rules == True: ## Append free_folds to data dict
+                if track_free_rules == True: ## Append free_folds to data dict
                     current["folds"] = (current["folds"] | set(next_rule) | free_folds)
                 else:
                     current["folds"] = (current["folds"] | set(next_rule))
