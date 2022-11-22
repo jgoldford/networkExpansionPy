@@ -137,12 +137,12 @@ def remove_current_folds_from_equal_rule_groups(current_folds, rule_groups):
 
     return new_rule_groups
 
-def next_iter_possible_rules(current_folds, rule2rn):
+def next_iter_possible_rules(current_folds, scope_rule2rn):
     """
     Returns a list of equal rule group dictionaries, keyed by rule size.
 
     :param current_folds: collection of current folds
-    :param rule2rn: dict of rule:rns (should be for scope)
+    :param scope_rule2rn: dict of rule:rns (should be for scope)
     :return: a list of equal rule group dictionaries, keyed by rule size
             [
                 {1:[rule1,rule2,rule2],3:[rule4,rule5]}, #dict of equal rules, 3 with len=1, 2 with len=3
@@ -151,7 +151,7 @@ def next_iter_possible_rules(current_folds, rule2rn):
     """
 
     ## Need to run these two calls every iteration of the fold expansion
-    future_rule2rns = rule2nextrns(current_folds, rule2rn)
+    future_rule2rns = rule2nextrns(current_folds, scope_rule2rn)
     equal_rule_groups = create_equal_rule_groups(future_rule2rns)
     equal_rule_groups = sort_equal_rule_groups(equal_rule_groups)
     equal_rule_groups = remove_current_folds_from_equal_rule_groups(current_folds, equal_rule_groups)
