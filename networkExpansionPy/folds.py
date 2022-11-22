@@ -40,9 +40,9 @@ def rule2nextrns(current_folds, rule2rn):
         enabled after that rule is added.
 
     :param current_folds: collection of folds to compare to
-    :param rule2rn: dict of rule:rns mappings to subset from, and then compare to
+    :param scope_rule2rn: dict of rule:rns mappings to subset from, and then compare to
     """
-    current_rule2rn = subset_rule2rn(current_folds, rule2rn)
+    current_rule2rn = subset_rule2rn(current_folds, scope_rule2rn)
     current_rns = set([rn for v in current_rule2rn.values() for rn in v])
     # print("interest- ", rule2rn[frozenset({'304', '222', '7581', '3321', '2002', '3323'})])
     # print(frozenset({'304', '222', '7581', '3321', '2002', '3323'}) <= current_rns)
@@ -53,7 +53,7 @@ def rule2nextrns(current_folds, rule2rn):
     #         print(v <= current_rns)
     #     if not (v <= current_rns):
     #         print(k, v)
-    return {k:(v | current_rns) for k,v in rule2rn.items() if not v <= current_rns}
+    return {k:(v | current_rns) for k,v in scope_rule2rn.items() if not v <= current_rns}
 
 def create_equal_rule_groups(rule2rn):
     """
