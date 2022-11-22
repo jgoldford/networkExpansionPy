@@ -200,8 +200,8 @@ def free_rules(current_folds, scope_rules2rn):
     
     This can occur for example if a rule is a subset of another rule which was selected.
 
-    :current_rns: collection of current reactions
-    :current_folds: collection of current folds
+    :param current_folds: collection of current folds
+    :param scope_rules2rn: dict of scope rules2rn
     :return: a set of rules whose folds are not part of current_folds, yet whose reactions
                 are all already enabled.
     """

@@ -287,6 +287,26 @@ class TestIndependentFunctions(unittest.TestCase):
         ## skip testing for now
         pass
 
+    def test_free_rules(self):
+        current_folds = {'F3','F11'}
+        rule2rn = {
+            frozenset({'F12'}): {'R2', 'R0'},
+            frozenset({'F11'}): {'R2', 'R0'},
+            frozenset({'F10','F11'}): {'R0'},
+            frozenset({'F0'}): {'R0'},
+            frozenset({'F1'}): {'R1'},
+            frozenset({'F2'}): {'R2'},
+            frozenset({'F3'}): {'R3'},
+            frozenset({'F4'}): {'R4'},
+            frozenset({'F5'}): {'R5'},
+            frozenset({'F6'}): {'R6'},
+            frozenset({'F7'}): {'R7'},
+            frozenset({'F8'}): {'R8'},
+            frozenset({'F9'}): {'R9'}
+            }
+
+        self.assertEqual(expected, second)
+
 class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
 
     maxDiff = None ## allows full output of failed test differences
