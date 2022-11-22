@@ -194,6 +194,22 @@ def update_iteration_dict(iteration_dict, current, iteration):
                 iteration_dict[dtype][i] = iteration
     return iteration_dict
 
+def free_rules(current_folds, scope_rules2rn):
+    """
+    Returns rules that weren't explicity added, yet whose reactions are already enabled.
+    
+    This can occur for example if a rule is a subset of another rule which was selected.
+
+    :current_rns: collection of current reactions
+    :current_folds: collection of current folds
+    :return: a set of rules whose folds are not part of current_folds, yet whose reactions
+                are all already enabled.
+    """
+    current_rule2rn = subset_rule2rn(current_folds, scope_rules2rn)
+    current_rns = set([rn for v in current_rule2rn.values() for rn in v])
+    return {k for k,v in scope_rules2rn.items() if (v <= current_rns) and not (k <= current_folds)}
+
+
 ########################################################################################################################
 ########################################################################################################################
 class FoldRules:
@@ -379,21 +395,6 @@ class FoldMetabolism:
         next_rule = rselect_func(r_effects)
         return next_rule, r_effects[next_rule], n_rules_checked, n_equal_rule_groups
     
-    def free_rules(self, current_folds):
-        """
-        Returns rules that weren't explicity added, yet whose reactions are already enabled.
-        
-        This can occur for example if a rule is a subset of another rule which was selected.
-
-        :current_rns: collection of current reactions
-        :current_folds: collection of current folds
-        :return: a set of rules whose folds are not part of current_folds, yet whose reactions
-                 are all already enabled.
-        """
-        current_rule2rn = subset_rule2rn(current_folds, self.scope_rules2rn)
-        current_rns = set([rn for v in current_rule2rn.values() for rn in v])
-        return {k for k,v in self.scope_rules2rn.items() if (v <= current_rns) and not (k <= current_folds)}
-
     def rule_order(self, free_rules=True):
         """
         Determine the ordering of all rules/folds.
@@ -445,7 +446,7 @@ class FoldMetabolism:
         init_rules2rn = subset_rule2rn(current["folds"], self.scope_rules2rn)
         current["cpds"], current["rns"] = self.fold_expand(init_rules2rn, current["cpds"])
         ## Add free folds to current dict
-        free_folds = {i for fs in self.free_rules(current["folds"]) for i in fs}
+        free_folds = {i for fs in free_rules(current["folds"], self.scope_rules2rn) for i in fs}
         if free_rules == True: ## Append free_folds to data dict
             current["folds"] = (current["folds"] | free_folds)
         remaining_folds = (self.scope_folds - current["folds"] - free_folds) ## Remove the free folds from the remaining folds regardless
@@ -464,8 +465,8 @@ class FoldMetabolism:
         else:
             keepgoing = False
 
-        print(f'{free_folds = }')
-        print(f'{remaining_folds = }')
+        # print(f'{free_folds = }')
+        # print(f'{remaining_folds = }')
         remaining_rules = {k:v for k,v in self.scope_rules2rn.items() if k not in subset_rule2rn(current["folds"], self.scope_rules2rn)}
         # print(f'{remaining_rules = }')
 
@@ -474,9 +475,9 @@ class FoldMetabolism:
         while keepgoing:
             start = timeit.default_timer()
             iteration += 1
-            print(f'{iteration = }')
+            # print(f'{iteration = }')
             next_rule, fdata, n_rules_checked, n_equal_rule_groups = self.select_next_rule(current["folds"], current["cpds"], current["rns"])
-            free_folds = {i for fs in self.free_rules((current["folds"] | set(next_rule))) for i in fs}
+            free_folds = {i for fs in free_rules((current["folds"] | set(next_rule)), self.scope_rules2rn) for i in fs}
             remaining_folds = (remaining_folds - set(next_rule) - free_folds)
 
             ## Stop conditions
