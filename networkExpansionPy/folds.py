@@ -396,6 +396,7 @@ class FoldMetabolism:
         r_effects, n_rules_checked, n_equal_rule_groups = self.loop_through_rules(current_folds, current_cpds, current_rns)
         if len(r_effects) == 0:
             next_rule = None
+            r_effects[next_rule] = {"cpds":deepcopy(current_cpds), "rns":deepcopy(current_rns)}
         else:
             next_rule = rselect_func(r_effects)
         return next_rule, r_effects[next_rule], n_rules_checked, n_equal_rule_groups
@@ -493,7 +494,9 @@ class FoldMetabolism:
             ## Stop conditions
             if len(remaining_folds) == 0:
                 keepgoing = False
-            if (fdata["cpds"] == current["cpds"]) and (fdata["rns"] == current["rns"]):
+            if next_rule == None:
+                keepgoing == False
+            elif (fdata["cpds"] == current["cpds"]) and (fdata["rns"] == current["rns"]):
                 keepgoing = False    
             else:
                 ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
