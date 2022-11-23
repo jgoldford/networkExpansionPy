@@ -23,7 +23,7 @@ def rule2rn(rn2rule):
                 rule2rn[fs] = set([rn])
     return rule2rn
 
-def subset_rule2rn(folds, rule2rn):
+def subset_rule2rn_from_folds(folds, rule2rn):
     """
     Returns a dictionary of rules:rns enabled by folds
     
@@ -42,18 +42,18 @@ def rule2nextrns(current_folds, rule2rn):
     :param current_folds: collection of folds to compare to
     :param scope_rule2rn: dict of rule:rns mappings to subset from, and then compare to
     """
-    current_rule2rn = subset_rule2rn(current_folds, scope_rule2rn)
-    current_rns = set([rn for v in current_rule2rn.values() for rn in v])
+    current_rule2rn = subset_rule2rn_from_folds(current_folds, scope_rule2rn)
+    permitted_rns = set([rn for v in current_rule2rn.values() for rn in v])
     # print("interest- ", rule2rn[frozenset({'304', '222', '7581', '3321', '2002', '3323'})])
-    # print(frozenset({'304', '222', '7581', '3321', '2002', '3323'}) <= current_rns)
+    # print(frozenset({'304', '222', '7581', '3321', '2002', '3323'}) <= permitted_rns)
     # for k,v in rule2rn.items():
     #     if k == frozenset({'304', '222', '7581', '3321', '2002', '3323'}):
     #         print("found")
     #         print(k, v)
-    #         print(v <= current_rns)
-    #     if not (v <= current_rns):
+    #         print(v <= permitted_rns)
+    #     if not (v <= permitted_rns):
     #         print(k, v)
-    return {k:(v | current_rns) for k,v in scope_rule2rn.items() if not v <= current_rns}
+    return {k:(v | permitted_rns) for k,v in scope_rule2rn.items() if not v <= permitted_rns}
 
 def create_equal_rule_groups(rule2rn):
     """
@@ -205,7 +205,7 @@ def free_rules(current_folds, scope_rules2rn):
     :return: a set of rules whose folds are not part of current_folds, yet whose reactions
                 are all already enabled.
     """
-    current_rule2rn = subset_rule2rn(current_folds, scope_rules2rn)
+    current_rule2rn = subset_rule2rn_from_folds(current_folds, scope_rules2rn)
     current_rns = set([rn for v in current_rule2rn.values() for rn in v])
     return {k for k,v in scope_rules2rn.items() if (v <= current_rns) and not (k <= current_folds)}
 
@@ -335,7 +335,7 @@ class FoldMetabolism:
         """
 
         potential_fold_set = (current_folds | set(rule))
-        potential_rule2rns = subset_rule2rn(potential_fold_set, self.scope_rules2rn)
+        potential_rule2rns = subset_rule2rn_from_folds(potential_fold_set, self.scope_rules2rn)
         cx,rx = self.fold_expand(potential_rule2rns, current_cpds)
 
         return potential_rule2rns, cx, rx
@@ -449,7 +449,7 @@ class FoldMetabolism:
 
         ################################################
         ## ITERATION 1 (using only seed folds and fold independent reactions)
-        init_rules2rn = subset_rule2rn(current["folds"], self.scope_rules2rn)
+        init_rules2rn = subset_rule2rn_from_folds(current["folds"], self.scope_rules2rn)
         current["cpds"], current["rns"] = self.fold_expand(init_rules2rn, current["cpds"])
         ## Add free folds to current dict
         free_folds = {i for fs in free_rules(current["folds"], self.scope_rules2rn) for i in fs}
@@ -463,7 +463,7 @@ class FoldMetabolism:
         metadict["n_rulegroups_in_iteration"][iteration] = 0
         metadict["n_rules_checked"][iteration] = 0
         metadict["max_n_remaining_folds"][iteration] = len(remaining_folds)
-        metadict["max_n_remaining_rules"][iteration] = len(self.scope_rules2rn) - len(subset_rule2rn(current["folds"], self.scope_rules2rn))
+        metadict["max_n_remaining_rules"][iteration] = len(self.scope_rules2rn) - len(subset_rule2rn_from_folds(current["folds"], self.scope_rules2rn))
 
         ## Needed in case expansion not possible at all
         if len(remaining_folds) > 0:
@@ -476,7 +476,7 @@ class FoldMetabolism:
 
         # print(f'{free_folds = }')
         # print(f'{remaining_folds = }')
-        remaining_rules = {k:v for k,v in self.scope_rules2rn.items() if k not in subset_rule2rn(current["folds"], self.scope_rules2rn)}
+        remaining_rules = {k:v for k,v in self.scope_rules2rn.items() if k not in subset_rule2rn_from_folds(current["folds"], self.scope_rules2rn)}
         # print(f'{remaining_rules = }')
 
         ################################################
@@ -516,7 +516,7 @@ class FoldMetabolism:
             metadict["n_rulegroups_in_iteration"][iteration] = n_equal_rule_groups
             metadict["n_rules_checked"][iteration] = n_rules_checked
             metadict["max_n_remaining_folds"][iteration] = len(remaining_folds)
-            metadict["max_n_remaining_rules"][iteration] = len(self.scope_rules2rn) - len(subset_rule2rn(current["folds"], self.scope_rules2rn))
+            metadict["max_n_remaining_rules"][iteration] = len(self.scope_rules2rn) - len(subset_rule2rn_from_folds(current["folds"], self.scope_rules2rn))
 
         return current, iteration_dict, metadict
 
