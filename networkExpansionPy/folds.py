@@ -356,6 +356,9 @@ class FoldMetabolism:
         """
 
         equal_rule_dict = next_iter_possible_rules(current_folds, self.scope_rules2rn)
+        if len(equal_rule_dict) == 0:
+            print("len(equal_rule_dict) == 0, reffects will be empty")
+            r_effects = dict()
 
         rule_sizes = set(list([i for d in equal_rule_dict for i in d.keys()]))
         n_rules_checked = 0 # for metadata
@@ -367,8 +370,7 @@ class FoldMetabolism:
                     rule = d[rsize][0]
                     _fdict = dict()
                     _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule(rule, current_folds, current_cpds)
-                    if len(_fdict["rns"] - current_rns) > 0:
-                        r_effects[rule] = _fdict
+                    r_effects[rule] = _fdict
                     n_rules_checked+=1
 
             ## Don't look for longer rules if shorter rules enable new reactions
@@ -392,7 +394,10 @@ class FoldMetabolism:
                 - and the number of equal rule groups this iteration
         """
         r_effects, n_rules_checked, n_equal_rule_groups = self.loop_through_rules(current_folds, current_cpds, current_rns)
-        next_rule = rselect_func(r_effects)
+        if len(r_effects) == 0:
+            next_rule = None
+        else:
+            next_rule = rselect_func(r_effects)
         return next_rule, r_effects[next_rule], n_rules_checked, n_equal_rule_groups
     
     def rule_order(self, track_free_rules=True):
