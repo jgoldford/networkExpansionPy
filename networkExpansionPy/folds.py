@@ -34,37 +34,38 @@ def subset_rule2rn_from_folds(folds, rule2rn):
     """
     return {k:v for k,v in rule2rn.items() if k <= set(folds)}
 
-def rule2nextrns(current_folds, rule2rn, restrict_to_new = True):
-    """
-    Returns a dictionary of rules:rns only for rules enabling reactions that 
-        are undiscovered by current_folds. Each rule will map to all reactions
-        enabled after that rule is added.
+# def rule2nextrns(current_folds, rule2rn, restrict_to_new = True):
 
-    :param current_folds: collection of folds to compare to
-    :param scope_rule2rn: dict of rule:rns mappings to subset from, and then compare to
-    :kwarg restrict_to_new: if true, only return rules which enable undiscoverd reactions
-                            if false, include all rules, even those which don't add any new reactions and which have been discovered
-    """
-    current_rule2rn = subset_rule2rn_from_folds(current_folds, scope_rule2rn)
-    return {k:v for k,v in scope_rule2rn.items() if not k in current_rule2rn} 
-    ## This would only return new rules, regardless of if they contribute new reactions. seeems like the best way to do this.
-    ##      but right now this only maps rules:that_rules_rns, not to all reactions which would be possible in total if that rule was added
+#     """
+#     Returns a dictionary of rules:rns only for rules enabling reactions that 
+#         are undiscovered by current_folds. Each rule will map to all reactions
+#         enabled after that rule is added.
+
+#     :param current_folds: collection of folds to compare to
+#     :param scope_rule2rn: dict of rule:rns mappings to subset from, and then compare to
+#     :kwarg restrict_to_new: if true, only return rules which enable undiscoverd reactions
+#                             if false, include all rules, even those which don't add any new reactions and which have been discovered
+#     """
+#     current_rule2rn = subset_rule2rn_from_folds(current_folds, scope_rule2rn)
+#     return {k:v for k,v in scope_rule2rn.items() if not k in current_rule2rn} 
+#     ## This would only return new rules, regardless of if they contribute new reactions. seeems like the best way to do this.
+#     ##      but right now this only maps rules:that_rules_rns, not to all reactions which would be possible in total if that rule was added
 
 
-    permitted_rns = set([rn for v in current_rule2rn.values() for rn in v])
-    # print("interest- ", rule2rn[frozenset({'304', '222', '7581', '3321', '2002', '3323'})])
-    # print(frozenset({'304', '222', '7581', '3321', '2002', '3323'}) <= permitted_rns)
-    # for k,v in rule2rn.items():
-    #     if k == frozenset({'304', '222', '7581', '3321', '2002', '3323'}):
-    #         print("found")
-    #         print(k, v)
-    #         print(v <= permitted_rns)
-    #     if not (v <= permitted_rns):
-    #         print(k, v)
-    if restrict_to_new:
-        return {k:(v | permitted_rns) for k,v in scope_rule2rn.items() if not v <= permitted_rns} ## will exclude already discovered rules
-    else:
-        return {k:(v | permitted_rns) for k,v in scope_rule2rn.items()} ## won't exclude already discovered rules
+#     permitted_rns = set([rn for v in current_rule2rn.values() for rn in v])
+#     # print("interest- ", rule2rn[frozenset({'304', '222', '7581', '3321', '2002', '3323'})])
+#     # print(frozenset({'304', '222', '7581', '3321', '2002', '3323'}) <= permitted_rns)
+#     # for k,v in rule2rn.items():
+#     #     if k == frozenset({'304', '222', '7581', '3321', '2002', '3323'}):
+#     #         print("found")
+#     #         print(k, v)
+#     #         print(v <= permitted_rns)
+#     #     if not (v <= permitted_rns):
+#     #         print(k, v)
+#     if restrict_to_new:
+#         return {k:(v | permitted_rns) for k,v in scope_rule2rn.items() if not v <= permitted_rns} ## will exclude already discovered rules
+#     else:
+#         return {k:(v | permitted_rns) for k,v in scope_rule2rn.items()} ## won't exclude already discovered rules
 
 def create_equal_rule_groups(rule2rn):
     """
@@ -148,7 +149,7 @@ def remove_current_folds_from_equal_rule_groups(current_folds, rule_groups):
 
     return new_rule_groups
 
-def next_iter_possible_rules(current_folds, scope_rule2rn):
+def next_iter_possible_rules(current_folds, scope_rule2rn, remaining_rules, current_rns):
     """
     Returns a list of equal rule group dictionaries, keyed by rule size.
 
@@ -162,8 +163,9 @@ def next_iter_possible_rules(current_folds, scope_rule2rn):
     """
 
     ## Need to run these two calls every iteration of the fold expansion
-    future_rule2rns = rule2nextrns(current_folds, scope_rule2rn)
-    equal_rule_groups = create_equal_rule_groups(future_rule2rns)
+    # future_rule2rns = rule2nextrns(current_folds, scope_rule2rn) ## This is just finnding rules from reamaining folds with current reactions appended to all values
+    future_rule2rns = {k:(v | current_rns) for k,v in remaining_rules.items()}
+    equal_rule_groups = create_equal_rule_groups(future_rule2rns) ## discards any rules which are strict subsets of others...
     equal_rule_groups = sort_equal_rule_groups(equal_rule_groups)
     equal_rule_groups = remove_current_folds_from_equal_rule_groups(current_folds, equal_rule_groups)
     # print(f"{future_rule2rns=}")
@@ -205,25 +207,25 @@ def update_iteration_dict(iteration_dict, current, iteration):
                 iteration_dict[dtype][i] = iteration
     return iteration_dict
 
-def free_rules(current_folds, scope_rules2rn):
-    """
-    Returns rules that weren't explicity added, yet whose reactions are already enabled.
+# def free_rules(current_folds, scope_rules2rn):
+#     """
+#     Returns rules that weren't explicity added, yet whose reactions are already enabled.
     
-    This can occur for example if a rule is a subset of another rule which was selected.
+#     This can occur for example if a rule is a subset of another rule which was selected.
 
-    Not all folds in free_rules are free
-    e.g. F1,F2 -> R1, F3 -> R1, F1 -> R7
-    If F3 already discovered, even though the first rule is redundent, it can't be "free"
-    because F1 additionally enables a new reaction (R7) which hasn't yet been discovered.
+#     Not all folds in free_rules are free
+#     e.g. F1,F2 -> R1, F3 -> R1, F1 -> R7
+#     If F3 already discovered, even though the first rule is redundent, it can't be "free"
+#     because F1 additionally enables a new reaction (R7) which hasn't yet been discovered.
 
-    :param current_folds: collection of current folds
-    :param scope_rules2rn: dict of scope rules2rn
-    :return: a set of rules whose folds are not part of current_folds, yet whose reactions
-                are all already enabled.
-    """
-    current_rule2rn = subset_rule2rn_from_folds(current_folds, scope_rules2rn)
-    current_rns = set([rn for v in current_rule2rn.values() for rn in v])
-    return {k for k,v in scope_rules2rn.items() if (v <= current_rns) and not (k <= current_folds)}
+#     :param current_folds: collection of current folds
+#     :param scope_rules2rn: dict of scope rules2rn
+#     :return: a set of rules whose folds are not part of current_folds, yet whose reactions
+#                 are all already enabled.
+#     """
+#     current_rule2rn = subset_rule2rn_from_folds(current_folds, scope_rules2rn)
+#     current_rns = set([rn for v in current_rule2rn.values() for rn in v])
+#     return {k for k,v in scope_rules2rn.items() if (v <= current_rns) and not (k <= current_folds)}
 
 
 ########################################################################################################################
@@ -422,14 +424,18 @@ class FoldMetabolism:
             _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(next_fold, current_folds, current_cpds)
             return next_rule, _fdict, 1, None
             
+        elif algorithm == "maxreactionsupersets":
+            r_effects, n_rules_checked, n_equal_rule_groups = self.loop_through_rules(current_folds, current_cpds, current_rns)
+            # if len(r_effects) == 0:
+            #     next_rule = None
+            #     r_effects[next_rule] = {"cpds":deepcopy(current_cpds), "rns":deepcopy(current_rns)}
+            # else:
+            #     next_rule = rselect_func(r_effects)
+            next_rule = rselect_func(r_effects)
+            return next_rule, r_effects[next_rule], n_rules_checked, n_equal_rule_groups
+
         elif algorithm == "maxreactions":
             r_effects, n_rules_checked, n_equal_rule_groups = self.loop_through_rules(current_folds, current_cpds, current_rns)
-            if len(r_effects) == 0:
-                next_rule = None
-                r_effects[next_rule] = {"cpds":deepcopy(current_cpds), "rns":deepcopy(current_rns)}
-            else:
-                next_rule = rselect_func(r_effects)
-            return next_rule, r_effects[next_rule], n_rules_checked, n_equal_rule_groups
     
     def rule_order(self, algorithm="randomfold"):
         """
