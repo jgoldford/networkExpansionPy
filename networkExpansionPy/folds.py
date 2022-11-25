@@ -4,6 +4,7 @@ from copy import deepcopy
 import timeit
 from pprint import pprint
 from collections import Counter
+import random
 
 asset_path = PurePath(__file__).parent / "assets"
 
@@ -33,7 +34,7 @@ def subset_rule2rn_from_folds(folds, rule2rn):
     """
     return {k:v for k,v in rule2rn.items() if k <= set(folds)}
 
-def rule2nextrns(current_folds, rule2rn):
+def rule2nextrns(current_folds, rule2rn, restrict_to_new = True):
     """
     Returns a dictionary of rules:rns only for rules enabling reactions that 
         are undiscovered by current_folds. Each rule will map to all reactions
@@ -41,8 +42,15 @@ def rule2nextrns(current_folds, rule2rn):
 
     :param current_folds: collection of folds to compare to
     :param scope_rule2rn: dict of rule:rns mappings to subset from, and then compare to
+    :kwarg restrict_to_new: if true, only return rules which enable undiscoverd reactions
+                            if false, include all rules, even those which don't add any new reactions and which have been discovered
     """
     current_rule2rn = subset_rule2rn_from_folds(current_folds, scope_rule2rn)
+    return {k:v for k,v in scope_rule2rn.items() if not k in current_rule2rn} 
+    ## This would only return new rules, regardless of if they contribute new reactions. seeems like the best way to do this.
+    ##      but right now this only maps rules:that_rules_rns, not to all reactions which would be possible in total if that rule was added
+
+
     permitted_rns = set([rn for v in current_rule2rn.values() for rn in v])
     # print("interest- ", rule2rn[frozenset({'304', '222', '7581', '3321', '2002', '3323'})])
     # print(frozenset({'304', '222', '7581', '3321', '2002', '3323'}) <= permitted_rns)
@@ -53,7 +61,10 @@ def rule2nextrns(current_folds, rule2rn):
     #         print(v <= permitted_rns)
     #     if not (v <= permitted_rns):
     #         print(k, v)
-    return {k:(v | permitted_rns) for k,v in scope_rule2rn.items() if not v <= permitted_rns}
+    if restrict_to_new:
+        return {k:(v | permitted_rns) for k,v in scope_rule2rn.items() if not v <= permitted_rns} ## will exclude already discovered rules
+    else:
+        return {k:(v | permitted_rns) for k,v in scope_rule2rn.items()} ## won't exclude already discovered rules
 
 def create_equal_rule_groups(rule2rn):
     """
@@ -200,6 +211,11 @@ def free_rules(current_folds, scope_rules2rn):
     
     This can occur for example if a rule is a subset of another rule which was selected.
 
+    Not all folds in free_rules are free
+    e.g. F1,F2 -> R1, F3 -> R1, F1 -> R7
+    If F3 already discovered, even though the first rule is redundent, it can't be "free"
+    because F1 additionally enables a new reaction (R7) which hasn't yet been discovered.
+
     :param current_folds: collection of current folds
     :param scope_rules2rn: dict of scope rules2rn
     :return: a set of rules whose folds are not part of current_folds, yet whose reactions
@@ -322,7 +338,7 @@ class FoldMetabolism:
         cx,rx = self.m.expand(cpds, reaction_mask=rn_tup_set)
         return set(cx), set([i[0] for i in rx])
 
-    def effect_per_rule(self, rule, current_folds, current_cpds):
+    def effect_per_rule_or_fold(self, rule, current_folds, current_cpds):
         """
         Returns the outcomes of an expansion using current folds plus
             folds from an additional `rule`.
@@ -369,7 +385,7 @@ class FoldMetabolism:
                     # only look at first rule among equals
                     rule = d[rsize][0]
                     _fdict = dict()
-                    _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule(rule, current_folds, current_cpds)
+                    _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(rule, current_folds, current_cpds)
                     r_effects[rule] = _fdict
                     n_rules_checked+=1
 
@@ -380,7 +396,7 @@ class FoldMetabolism:
         ## r_effects now only fills will rules that actually end up adding reactions
         return r_effects, n_rules_checked, len(equal_rule_dict)
 
-    def select_next_rule(self, current_folds, current_cpds, current_rns, rselect_func=maxreactions):
+    def select_next_rule_or_fold(self, current_folds, current_cpds, current_rns, remaining_folds, remaining_rules, algorithm="maxreactions"):#rselect_func=maxreactions):
         """
         Determines the next rule and its effects on cpds, rns, and rules, based on the selection function.
 
@@ -393,15 +409,29 @@ class FoldMetabolism:
                 - and for metadata purposes, also return the number of rules checked
                 - and the number of equal rule groups this iteration
         """
-        r_effects, n_rules_checked, n_equal_rule_groups = self.loop_through_rules(current_folds, current_cpds, current_rns)
-        if len(r_effects) == 0:
-            next_rule = None
-            r_effects[next_rule] = {"cpds":deepcopy(current_cpds), "rns":deepcopy(current_rns)}
-        else:
-            next_rule = rselect_func(r_effects)
-        return next_rule, r_effects[next_rule], n_rules_checked, n_equal_rule_groups
+        if algorithm == "randomfold":
+            next_fold = random.choice(remaining_folds)
+            _fdict = dict()
+            _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(next_fold, current_folds, current_cpds)
+            return next_fold, _fdict, 1, None
+
+        elif algorithm == "randomrule":
+            rule_size_dict = rule_sizes(remaining_rules)
+            next_rule = random.choice(rule_size_dict[min(rule_size_dict)])
+            _fdict = dict()
+            _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(next_fold, current_folds, current_cpds)
+            return next_rule, _fdict, 1, None
+            
+        elif algorithm == "maxreactions":
+            r_effects, n_rules_checked, n_equal_rule_groups = self.loop_through_rules(current_folds, current_cpds, current_rns)
+            if len(r_effects) == 0:
+                next_rule = None
+                r_effects[next_rule] = {"cpds":deepcopy(current_cpds), "rns":deepcopy(current_rns)}
+            else:
+                next_rule = rselect_func(r_effects)
+            return next_rule, r_effects[next_rule], n_rules_checked, n_equal_rule_groups
     
-    def rule_order(self, track_free_rules=True):
+    def rule_order(self, algorithm="randomfold"):
         """
         Determine the ordering of all rules/folds.
 
@@ -412,6 +442,9 @@ class FoldMetabolism:
                            (Probably I want to just remove this kwarg and
                             always have this enabled...)
         """
+        valid_algorithms = ["randomfold", "randomrule", "maxreactions"]
+        if algorithm.lower() not in valid_algorithms:
+            raise ValueError("algorithm must be one of %s"%valid_algorithms)
 
         if (self.seed_cpds == None) or (self.seed_folds == None):
             raise ValueError("self.seed_cpds and self.seed_folds must not be None")
@@ -451,15 +484,12 @@ class FoldMetabolism:
         ## ITERATION 1 (using only seed folds and fold independent reactions)
         init_rules2rn = subset_rule2rn_from_folds(current["folds"], self.scope_rules2rn)
         current["cpds"], current["rns"] = self.fold_expand(init_rules2rn, current["cpds"])
-        ## Add free folds to current dict
-        free_folds = {i for fs in free_rules(current["folds"], self.scope_rules2rn) for i in fs}
-        if track_free_rules == True: ## Append free_folds to data dict
-            current["folds"] = (current["folds"] | free_folds)
-        remaining_folds = (self.scope_folds - current["folds"] - free_folds) ## Remove the free folds from the remaining folds regardless
+        remaining_folds = (self.scope_folds - current["folds"]) 
+        remaining_rules = {k:v for k,v in self.scope_rules2rn.items() if len(k & remaining_folds)>0}
         iteration_dict = update_iteration_dict(iteration_dict, current, iteration)
         ## Update metadata
         metadict["runtime"][iteration] = timeit.default_timer() - start
-        metadict["freefolds"][iteration] = free_folds
+        # metadict["freefolds"][iteration] = free_folds
         metadict["n_rulegroups_in_iteration"][iteration] = 0
         metadict["n_rules_checked"][iteration] = 0
         metadict["max_n_remaining_folds"][iteration] = len(remaining_folds)
@@ -476,7 +506,7 @@ class FoldMetabolism:
 
         # print(f'{free_folds = }')
         # print(f'{remaining_folds = }')
-        remaining_rules = {k:v for k,v in self.scope_rules2rn.items() if k not in subset_rule2rn_from_folds(current["folds"], self.scope_rules2rn)}
+        # remaining_rules = {k:v for k,v in self.scope_rules2rn.items() if k not in subset_rule2rn_from_folds(current["folds"], self.scope_rules2rn)}
         # print(f'{remaining_rules = }')
 
         ################################################
@@ -487,9 +517,10 @@ class FoldMetabolism:
             print("rule_order iteration: ", iteration)
             for k,v in metadict.items():
                 print(k, v)
-            next_rule, fdata, n_rules_checked, n_equal_rule_groups = self.select_next_rule(current["folds"], current["cpds"], current["rns"])
-            free_folds = {i for fs in free_rules((current["folds"] | set(next_rule)), self.scope_rules2rn) for i in fs}
-            remaining_folds = (remaining_folds - set(next_rule) - free_folds)
+            next_rule, fdata, n_rules_checked, n_equal_rule_groups = self.select_next_rule_or_fold(current["folds"], current["cpds"], current["rns"], remaining_folds, remaining_rules, algorithm)
+            remaining_folds = (remaining_folds - set(next_rule))
+            remaining_rules = {k:v for k,v in self.scope_rules2rn.items() if len(k & remaining_folds)>0}
+            # remaining_rules = {k:v for k,v in self.scope_rules2rn.items() if k not in subset_rule2rn_from_folds(current["folds"], self.scope_rules2rn)}
 
             ## Stop conditions
             if len(remaining_folds) == 0:
@@ -500,10 +531,7 @@ class FoldMetabolism:
                 keepgoing = False    
             else:
                 ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
-                if track_free_rules == True: ## Append free_folds to data dict
-                    current["folds"] = (current["folds"] | set(next_rule) | free_folds)
-                else:
-                    current["folds"] = (current["folds"] | set(next_rule))
+                current["folds"] = (current["folds"] | set(next_rule))
                 current["cpds"] = fdata["cpds"]
                 current["rns"] = fdata["rns"]
                 
@@ -512,7 +540,7 @@ class FoldMetabolism:
 
             ## Update metadata
             metadict["runtime"][iteration] = timeit.default_timer() - start
-            metadict["freefolds"][iteration] = free_folds
+            # metadict["freefolds"][iteration] = free_folds
             metadict["n_rulegroups_in_iteration"][iteration] = n_equal_rule_groups
             metadict["n_rules_checked"][iteration] = n_rules_checked
             metadict["max_n_remaining_folds"][iteration] = len(remaining_folds)
