@@ -114,10 +114,12 @@ def create_equal_rule_groups(rule2rn):
             if k != k2:
                 if v2 <= v:
                     if v2!=v:
+                        # maps to the a strict subset of reactions
                         strictsubsets.add(k2)
                         strictsubset_ks.add(k2)
                     else: # v2==v
-                        equal_ks.add(k2)
+                        # maps to the exact same reactions
+                        equal_ks.add(k2) 
         
         er = EquivilentRule(equal_ks, strictsubset_ks)
         if er not in equal_groups:
@@ -130,7 +132,7 @@ def create_equal_rule_groups(rule2rn):
     # return {d for d in equal_groups if not d[0] & strictsubsets}
     # return [{d[0]:d[1]} for d in equal_groups if not d[0] & strictsubsets]
     # return [{"superset":d[0], "subset":d[1]} for d in equal_groups if not d[0] & strictsubsets]
-    return set([i for i in equal_groups if not i.equal_supersets & strictsubsets])
+    return set([i for i in equal_groups if not i.equal_supersets & strictsubsets]) ## ignore equivilent rules that have supersets
 
 def sort_equal_rule_groups(equal_rule_groups):
     """
@@ -245,7 +247,7 @@ def next_iter_possible_rules(current_fold2s, scope_rule2rn, remaining_rules, cur
         i.equal_supersets_by_size = rule_sizes(i.equal_supersets)
         i.equal_subsets_by_size = rule_sizes(i.equal_subsets)
     
-    equal_rule_groups = set(list(new_equal_rule_groups))
+    equal_rule_groups = set(list(equal_rule_groups)) ## gets rid of duplicates
     # print(f"{future_rule2rns=}")
     # equal_rule_dict = [rule_sizes(i) for i in equal_rule_groups]
 
@@ -513,14 +515,15 @@ class FoldMetabolism:
         """
 
         equal_rule_dict = next_iter_possible_rules(current_folds, self.scope_rules2rn)
-        if len(equal_rule_dict) == 0:
-            print("len(equal_rule_dict) == 0, reffects will be empty")
-            r_effects = dict()
+        # if len(equal_rule_dict) == 0:
+        #     print("len(equal_rule_dict) == 0, reffects will be empty")
+        #     r_effects = dict()
 
         ## LEFT OFF HERE ON NOV 25--NEED TO LOOP THROUGH MY EQUAL_RULE_DICT OF OBJECTS TO REWRITE THE NEXT BIT HERE
         ##      TAKING INTO ACCOUNT THAT I NEED TO CHANGE HOW I BREAK SINCE ALL R_EFFECTS WILL BE >0 NOW, AND
         ##      THAT I HAVE TO SEARCH THE EQUAL_RULE_DICT_SUBSETS FOR WHATEVER SUPERSETS ARE FOUND TO GENERATE THE MAX
         ##      NUMBER OF REACTIONS. Only have to search subsets which have the same rulesize as the discovered superset though.
+        ## It could also be that some subsets have shorter rule lengths than the supersets, which complicates things. 
 
         superset_rule_sizes = set(list([i for d in equal_rule_dict for i in d[0].keys()]))
         n_rules_checked = 0 # for metadata
@@ -528,7 +531,6 @@ class FoldMetabolism:
             r_effects = dict()
             for d_superset, d_subset in equal_rule_dict:
                 if rsize in d_superset:
-                    # only look at first rule among equals
                     rule = random.choice(d_superset[rsize][0]) ## chose a random rule from equivilent rules
                     _fdict = dict()
                     _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(rule, current_folds, current_cpds)
