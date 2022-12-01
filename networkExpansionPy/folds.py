@@ -527,6 +527,7 @@ class FoldMetabolism:
 
         superset_rule_sizes = set(list([i for d in equal_rule_dict for i in d[0].keys()]))
         n_rules_checked = 0 # for metadata
+        rule_enabling_new_rns_found = False
         for rsize in sorted(superset_rule_sizes):
             r_effects = dict()
             for d_superset, d_subset in equal_rule_dict:
@@ -536,10 +537,24 @@ class FoldMetabolism:
                     _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(rule, current_folds, current_cpds)
                     r_effects[rule] = _fdict
                     n_rules_checked+=1
+                    if len(_fdict["rns"] - current_rns) > 0:
+                        rule_enabling_new_rns_found = True
+                   
 
             ## Don't look for longer rules if shorter rules enable new reactions
-            if len(r_effects) > 0:
+            if rule_enabling_new_rns_found:
                 break
+        if rule_enabling_new_rns_found:
+            k_vcount = {k:len(v["rns"]) for k,v in r_effects.items()}
+            max_v = max(k_vcount.values())
+            max_rules = [k for k,v in k_vcount.items() if v==max_v]
+
+        ## NOVEMBER 30
+        ## We can choose on random rule from the max_rules, and then
+        ##  do expansions for every subset within to see if aubsets can also provide max_v number
+        ##  of reactions. 
+        ## The one issue is, what if i find a superset for rulesize=2, where a subset happens to have rulesize=1
+        ##  yet still is able to introduce the same number of new reactions...
 
         ## r_effects now only fills will rules that actually end up adding reactions
         return r_effects, n_rules_checked, len(equal_rule_dict)
