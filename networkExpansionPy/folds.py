@@ -459,47 +459,7 @@ class FoldMetabolism:
 
         return potential_rule2rns, cx, rx
 
-    # def loop_through_rules(self, current_folds, current_cpds, current_rns):
-    #     """
-    #     Loops through all remaining rules in the scope and returns a dict 
-    #         of rule:{rule2rn:... , cpds:... , rns:...} denoting the
-    #         outcome of adding each rule.
-
-    #     :param current_folds: collection of current folds
-    #     :param current_cpds: collection of current cpds
-    #     :param current_rns: collection of current rns
-    #     :return: - a dict of rule:{rule2rn:... , cpds:... , rns:...} 
-    #                denoting the outcome of adding each rule.
-    #              - n_rules_checked for metadata purposes
-    #              - n_equal_rule_groups for metadata purposes
-    #     """
-
-    #     equal_rule_dict = next_iter_possible_rules(current_folds2, self.scope_rules2rn)
-    #     if len(equal_rule_dict) == 0:
-    #         print("len(equal_rule_dict) == 0, reffects will be empty")
-    #         r_effects = dict()
-
-    #     rule_sizes = set(list([i for d in equal_rule_dict for i in d.keys()]))
-    #     n_rules_checked = 0 # for metadata
-    #     for rsize in sorted(rule_sizes):
-    #         r_effects = dict()
-    #         for d in equal_rule_dict:
-    #             if rsize in d:
-    #                 # only look at first rule among equals
-    #                 rule = d[rsize][0]
-    #                 _fdict = dict()
-    #                 _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(rule, current_folds, current_cpds)
-    #                 r_effects[rule] = _fdict
-    #                 n_rules_checked+=1
-
-    #         ## Don't look for longer rules if shorter rules enable new reactions
-    #         if len(r_effects) > 0:
-    #             break
-
-    #     ## r_effects now only fills will rules that actually end up adding reactions
-    #     return r_effects, n_rules_checked, len(equal_rule_dict)
-
-    def loop_through_rules(self, current_folds, current_cpds, current_rns):
+    def loop_through_rules(self, current_folds, current_cpds, current_rns, remaining_rules):
         """
         Loops through all remaining rules in the scope and returns a dict 
             of rule:{rule2rn:... , cpds:... , rns:...} denoting the
@@ -514,30 +474,24 @@ class FoldMetabolism:
                  - n_equal_rule_groups for metadata purposes
         """
 
-        equal_rule_dict = next_iter_possible_rules(current_folds, self.scope_rules2rn)
-        # if len(equal_rule_dict) == 0:
-        #     print("len(equal_rule_dict) == 0, reffects will be empty")
-        #     r_effects = dict()
+        equal_rule_dict = next_iter_possible_rules(current_folds, self.scope_rules2rn, remaining_rules, current_rns)
 
-        ## LEFT OFF HERE ON NOV 25--NEED TO LOOP THROUGH MY EQUAL_RULE_DICT OF OBJECTS TO REWRITE THE NEXT BIT HERE
-        ##      TAKING INTO ACCOUNT THAT I NEED TO CHANGE HOW I BREAK SINCE ALL R_EFFECTS WILL BE >0 NOW, AND
-        ##      THAT I HAVE TO SEARCH THE EQUAL_RULE_DICT_SUBSETS FOR WHATEVER SUPERSETS ARE FOUND TO GENERATE THE MAX
-        ##      NUMBER OF REACTIONS. Only have to search subsets which have the same rulesize as the discovered superset though.
-        ## It could also be that some subsets have shorter rule lengths than the supersets, which complicates things. 
+        # possible nfolds/rules across all rules
+        all_rule_sizes = set()
+        for er in equal_rule_dict:
+            all_rule_sizes |= set(er.equal_supersets_by_size.keys())
+            all_rule_sizes |= set(er.equal_subsets_by_size.keys())
 
-        superset_rule_sizes = set(list([i for d in equal_rule_dict for i in d[0].keys()]))
         n_rules_checked = 0 # for metadata
         rule_enabling_new_rns_found = False
         rsize_enabled_new_rns_founds = 0
         er_effects = dict()
-        for rsize in sorted(superset_rule_sizes):
-            # r_effects = dict()
+        for rsize in sorted(all_rule_sizes):
             for d in equal_rule_dict:
                 if (rsize in d.equal_supersets_by_size) or (rsize in d.equal_subsets_by_size) and (d not in er_effects):
-                    rule = d.equal_supersets_by_size[rsize][0] ## this part doesn't have to be random because it's just to see what the equivilent rule does
+                    rule = d.equal_supersets_by_size[rsize][0] 
                     _fdict = dict()
                     _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(rule, current_folds, current_cpds)
-                    # r_effects[rule] = _fdict
                     er_effects[d] = _fdict
                     n_rules_checked+=1
                     if len(_fdict["rns"] - current_rns) > 0:
@@ -548,13 +502,16 @@ class FoldMetabolism:
                 rsize_enabled_new_rns_founds = copy(rsize)
                 break   
 
-        ## at this point i have all the ERs which are ever going to be checked
+        ## At this point we have all the ERs which are ever going to be checked
 
         ## If any of the ers give new reactions
         if rule_enabling_new_rns_found:
             k_vcount = {k:len(v["rns"]) for k,v in er_effects.items()}
             max_v = max(k_vcount.values())
             ers_with_max_v = [k for k,v in k_vcount.items() if v==max_v]
+
+        ## SOME TESTING BY MANUALLY FORCING THIS TO 2
+        # rsize_enabled_new_rns_founds = 2
 
         ## Now for ever ER with max_v, we need to find all the rules (even subsets) which yield max_v, so long as they have 
         ##  length <= rsize_enabling_new_rns_found
@@ -576,17 +533,7 @@ class FoldMetabolism:
                             r_effects[rule] = _fdict
 
         ## r_effects now only fills with rules which are at LEAST max_v, and can include subsets so long as their superset provided max_v new reactions
-        return r_effects, n_rules_checked, len(equal_rule_dict)
-
-        ## NOVEMBER 30
-        ## We can choose on random rule from the max_rules, and then
-        ##  do expansions for every subset within to see if aubsets can also provide max_v number
-        ##  of reactions. 
-        ## The one issue is, what if i find a superset for rulesize=2, where a subset happens to have rulesize=1
-        ##  yet still is able to introduce the same number of new reactions...
-
-        ## r_effects now only fills will rules that actually end up adding reactions
-        # return r_effects, n_rules_checked, len(equal_rule_dict)
+        return r_effects, n_rules_checked, equal_rule_dict, er_effects
 
     def select_next_rule_or_fold(self, current_folds, current_cpds, current_rns, remaining_folds, remaining_rules, algorithm="maxreactions"):#rselect_func=maxreactions):
         """
@@ -615,17 +562,17 @@ class FoldMetabolism:
             return next_rule, _fdict, 1, None
             
         elif algorithm == "maxreactionsupersets":
-            r_effects, n_rules_checked, n_equal_rule_groups = self.loop_through_rules(current_folds, current_cpds, current_rns)
-            # if len(r_effects) == 0:
-            #     next_rule = None
-            #     r_effects[next_rule] = {"cpds":deepcopy(current_cpds), "rns":deepcopy(current_rns)}
-            # else:
-            #     next_rule = rselect_func(r_effects)
-            next_rule = rselect_func(r_effects)
-            return next_rule, r_effects[next_rule], n_rules_checked, n_equal_rule_groups
+            r_effects, n_rules_checked, equal_rule_dict, er_effects = self.loop_through_rules(current_folds, current_cpds, current_rns)
+            if len(r_effects) == 0:
+                next_rule = None
+                r_effects[next_rule] = {"cpds":deepcopy(current_cpds), "rns":deepcopy(current_rns)}
+            else:
+                random_equivilent_rule = random.choice(sorted(r_effects.keys()))
+                next_rule = r_effects[random_equivilent_rule]
+            return next_rule, r_effects[next_rule], n_rules_checked, equal_rule_dict #, er_effects
 
-        elif algorithm == "maxreactions":
-            r_effects, n_rules_checked, n_equal_rule_groups = self.loop_through_rules(current_folds, current_cpds, current_rns)
+        # elif algorithm == "maxreactions":
+        #     r_effects, n_rules_checked, n_equal_rule_groups = self.loop_through_rules(current_folds, current_cpds, current_rns)
     
     def rule_order(self, algorithm="randomfold"):
         """
