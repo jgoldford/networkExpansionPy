@@ -34,66 +34,6 @@ def subset_rule2rn_from_folds(folds, rule2rn):
     """
     return {k:v for k,v in rule2rn.items() if k <= set(folds)}
 
-# def rule2nextrns(current_folds, rule2rn, restrict_to_new = True):
-
-#     """
-#     Returns a dictionary of rules:rns only for rules enabling reactions that 
-#         are undiscovered by current_folds. Each rule will map to all reactions
-#         enabled after that rule is added.
-
-#     :param current_folds: collection of folds to compare to
-#     :param scope_rule2rn: dict of rule:rns mappings to subset from, and then compare to
-#     :kwarg restrict_to_new: if true, only return rules which enable undiscoverd reactions
-#                             if false, include all rules, even those which don't add any new reactions and which have been discovered
-#     """
-#     current_rule2rn = subset_rule2rn_from_folds(current_folds, scope_rule2rn)
-#     return {k:v for k,v in scope_rule2rn.items() if not k in current_rule2rn} 
-#     ## This would only return new rules, regardless of if they contribute new reactions. seeems like the best way to do this.
-#     ##      but right now this only maps rules:that_rules_rns, not to all reactions which would be possible in total if that rule was added
-
-
-#     permitted_rns = set([rn for v in current_rule2rn.values() for rn in v])
-#     # print("interest- ", rule2rn[frozenset({'304', '222', '7581', '3321', '2002', '3323'})])
-#     # print(frozenset({'304', '222', '7581', '3321', '2002', '3323'}) <= permitted_rns)
-#     # for k,v in rule2rn.items():
-#     #     if k == frozenset({'304', '222', '7581', '3321', '2002', '3323'}):
-#     #         print("found")
-#     #         print(k, v)
-#     #         print(v <= permitted_rns)
-#     #     if not (v <= permitted_rns):
-#     #         print(k, v)
-#     if restrict_to_new:
-#         return {k:(v | permitted_rns) for k,v in scope_rule2rn.items() if not v <= permitted_rns} ## will exclude already discovered rules
-#     else:
-#         return {k:(v | permitted_rns) for k,v in scope_rule2rn.items()} ## won't exclude already discovered rules
-
-# def create_equal_rule_groups(rule2rn):
-#     """
-#     Returns a set of equivilent rule collections.
-
-#     Collections and the rules they contain are each frozensets.
-
-#     :param rule2rn: dict of rule:rns to create equal rule groups from
-#     :return: set of frozensets (i.e. groups of equivilent rules) of frozensets (i.e. rules) 
-#     """
-
-#     strictsubset_ks = set()
-#     equal_groups = set()
-#     for k, v in rule2rn.items():
-#         equal_ks = {k}
-#         for k2, v2 in rule2rn.items():
-#             if k != k2:
-#                 if v2 <= v:
-#                     if v2!=v:
-#                         strictsubset_ks.add(k2)
-#                     else: # v2==v
-#                         equal_ks.add(k2)
-        
-#         equal_groups.add(frozenset(equal_ks))
-
-#     ## exclude groups which include any strict subset rules
-#     return {i for i in equal_groups if not i & strictsubset_ks}
-
 def create_equal_rule_groups(rule2rn):
     """
     Returns a set of equivilent rule collections.
@@ -124,14 +64,7 @@ def create_equal_rule_groups(rule2rn):
         er = EquivilentRule(equal_ks, strictsubset_ks)
         if er not in equal_groups:
             equal_groups.append(er)
-        # equal_groups.append((frozenset(equal_ks),frozenset(strictsubset_ks)))
-        # equal_groups.append({frozenset(equal_ks):frozenset(strictsubset_ks)})
-    
-    # equal_groups = set(equal_groups)
-    ## exclude groups which include any strict subset rules
-    # return {d for d in equal_groups if not d[0] & strictsubsets}
-    # return [{d[0]:d[1]} for d in equal_groups if not d[0] & strictsubsets]
-    # return [{"superset":d[0], "subset":d[1]} for d in equal_groups if not d[0] & strictsubsets]
+
     return set([i for i in equal_groups if not i.equal_supersets & strictsubsets]) ## ignore equivilent rules that have supersets
 
 def sort_equal_rule_groups(equal_rule_groups):
@@ -165,57 +98,6 @@ def rule_sizes(rule_group):
             element_lengths[l].append(i)
     return element_lengths
 
-# def remove_current_folds_from_equal_rule_groups(current_folds, rule_groups):
-#     """ 
-#     Returns a list of rule groups with current folds removed.
-
-#     Preserves ordering from `rule_groups`.
-
-#     :param current_folds: collection of current folds
-#     :param rule_groups: a collection of equivilent rule groups
-#     :return: a list of rule groups with current folds removed
-#     """
-
-#     new_rule_groups = []
-#     for rg in rule_groups:
-#         new_group = []
-#         # this construction allows us to preserve the ordering from create_equal_rule_groups
-#         for i in rg:
-#             new_rule = frozenset(i) - current_folds
-#             if len(new_rule) > 0:
-#                 new_group.append(new_rule)
-#         if len(new_group) > 0:
-#             new_rule_groups.append(new_group)
-
-#     return new_rule_groups
-
-# def next_iter_possible_rules(current_folds2, scope_rule2rn, remaining_rules, current_rns):
-#     """
-#     Returns a list of equal rule group dictionaries, keyed by rule size.
-
-#     :param current_folds: collection of current folds
-#     :param scope_rule2rn: dict of rule:rns (should be for scope)
-#     :return: a list of equal rule group dictionaries, keyed by rule size
-#             [
-#                 {1:[rule1,rule2,rule2],3:[rule4,rule5]}, #dict of equal rules, 3 with len=1, 2 with len=3
-#                 {1:[rule7,rule8],3:[rule9]}              
-#             ]
-#     """
-
-#     ## Need to run these two calls every iteration of the fold expansion
-#     # future_rule2rns = rule2nextrns(current_folds, scope_rule2rn) ## This is just finnding rules from reamaining folds with current reactions appended to all values
-#     future_rule2rns = {k:(v | current_rns) for k,v in remaining_rules.items()}
-#     equal_rule_groups = create_equal_rule_groups(future_rule2rns) ## discards any rules which are strict subsets of others...
-#     equal_rule_groups = sort_equal_rule_groups(equal_rule_groups)
-#     equal_rule_groups = remove_current_folds_from_equal_rule_groups(current_folds, equal_rule_groups)
-#     # print(f"{future_rule2rns=}")
-#     # equal_rule_dict = [rule_sizes(i) for i in equal_rule_groups]
-
-#     # print("\tEliminated folds/rules that enable subsets of others' reactions.")
-#     # print("\t\t%i folds available for the NEXT ITERATION"%len(set([f for g in equal_rule_groups for r in g for f in r])))
-#     # print("\t\t%i rules available for the NEXT ITERATION"%len(equal_rule_groups))
-#     return [rule_sizes(i) for i in equal_rule_groups]
-
 def next_iter_possible_rules(current_folds, scope_rule2rn, remaining_rules, current_rns):
     """
     Returns a list of equal rule group dictionaries, keyed by rule size.
@@ -229,16 +111,8 @@ def next_iter_possible_rules(current_folds, scope_rule2rn, remaining_rules, curr
             ]
     """
 
-    ## Need to run these two calls every iteration of the fold expansion
-    # future_rule2rns = rule2nextrns(current_folds, scope_rule2rn) ## This is just finnding rules from reamaining folds with current reactions appended to all values
     future_rule2rns = {k:(v | current_rns) for k,v in remaining_rules.items()}
     equal_rule_groups = create_equal_rule_groups(future_rule2rns) ## discards any rules which are strict subsets of others...
-    # equal_rule_groups = sort_equal_rule_groups(equal_rule_groups)
-    # new_equal_rule_groups = []
-    # for superset,subset in equal_rule_groups.items():
-    #     i = frozenset([rule-current_folds for rule in superset])
-    #     j = frozenset([rule-current_folds for rule in subset])
-    #     new_equal_rule_groups.append({i:j})
     ## Remove current folds from each equivilent rule group
     for i in equal_rule_groups:
         i.equal_supersets = [frozenset(rule - current_folds) for rule in i.equal_supersets]
@@ -248,8 +122,6 @@ def next_iter_possible_rules(current_folds, scope_rule2rn, remaining_rules, curr
         i.equal_subsets_by_size = rule_sizes(i.equal_subsets)
     
     equal_rule_groups = set(list(equal_rule_groups)) ## gets rid of duplicates
-    # print(f"{future_rule2rns=}")
-    # equal_rule_dict = [rule_sizes(i) for i in equal_rule_groups]
 
     # print("\tEliminated folds/rules that enable subsets of others' reactions.")
     # print("\t\t%i folds available for the NEXT ITERATION"%len(set([f for g in equal_rule_groups for r in g for f in r])))
