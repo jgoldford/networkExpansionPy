@@ -98,12 +98,11 @@ def rule_sizes(rule_group):
             element_lengths[l].append(i)
     return element_lengths
 
-def next_iter_possible_rules(current_folds, scope_rule2rn, remaining_rules, current_rns):
+def next_iter_possible_rules(current_folds, remaining_rules, current_rns):
     """
     Returns a list of equal rule group dictionaries, keyed by rule size.
 
     :param current_folds: collection of current folds
-    :param scope_rule2rn: dict of rule:rns (should be for scope)
     :return: a list of equal rule group dictionaries, keyed by rule size
             [
                 {1:[rule1,rule2,rule2],3:[rule4,rule5]}, #dict of equal rules, 3 with len=1, 2 with len=3
@@ -346,7 +345,7 @@ class FoldMetabolism:
                  - n_equal_rule_groups for metadata purposes
         """
 
-        equal_rule_dict = next_iter_possible_rules(current_folds, self.scope_rules2rn, remaining_rules, current_rns)
+        equal_rule_dict = next_iter_possible_rules(current_folds, remaining_rules, current_rns)
 
         # possible nfolds/rules across all rules
         all_rule_sizes = set()
@@ -361,7 +360,8 @@ class FoldMetabolism:
         for rsize in sorted(all_rule_sizes):
             for d in equal_rule_dict:
                 if (rsize in d.equal_supersets_by_size) or (rsize in d.equal_subsets_by_size) and (d not in er_effects):
-                    rule = d.equal_supersets_by_size[rsize][0] 
+                    superset_size_key = sorted(d.equal_supersets_by_size.keys())[0] # doesn't matter which superset we expand, just take the first. this is needed in case the rsize of a subset isn't in a superset
+                    rule = d.equal_supersets_by_size[superset_size_key][0] 
                     _fdict = dict()
                     _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(rule, current_folds, current_cpds)
                     er_effects[d] = _fdict
@@ -407,7 +407,7 @@ class FoldMetabolism:
         ## r_effects now only fills with rules which are at LEAST max_v, and can include subsets so long as their superset provided max_v new reactions
         return r_effects, n_rules_checked, equal_rule_dict, er_effects
 
-    def select_next_rule_or_fold(self, current_folds, current_cpds, current_rns, remaining_folds, remaining_rules, algorithm="maxreactions"):#rselect_func=maxreactions):
+    def select_next_rule_or_fold(self, current_folds, current_cpds, current_rns, remaining_folds, remaining_rules, algorithm="maxreactionsupersets"):#rselect_func=maxreactions):
         """
         Determines the next rule and its effects on cpds, rns, and rules, based on the selection function.
 
@@ -434,19 +434,18 @@ class FoldMetabolism:
             return next_rule, _fdict, 1, None
             
         elif algorithm == "maxreactionsupersets":
-            r_effects, n_rules_checked, equal_rule_dict, er_effects = self.loop_through_rules(current_folds, current_cpds, current_rns)
+            r_effects, n_rules_checked, equal_rule_dict, er_effects = self.loop_through_rules(current_folds, current_cpds, current_rns, remaining_rules)
             if len(r_effects) == 0:
                 next_rule = None
                 r_effects[next_rule] = {"cpds":deepcopy(current_cpds), "rns":deepcopy(current_rns)}
             else:
-                random_equivilent_rule = random.choice(sorted(r_effects.keys()))
-                next_rule = r_effects[random_equivilent_rule]
-            return next_rule, r_effects[next_rule], n_rules_checked, equal_rule_dict #, er_effects
+                next_rule = random.choice(sorted(r_effects.keys()))
+            return next_rule, r_effects[next_rule], n_rules_checked, len(equal_rule_dict) #, er_effects
 
         # elif algorithm == "maxreactions":
         #     r_effects, n_rules_checked, n_equal_rule_groups = self.loop_through_rules(current_folds, current_cpds, current_rns)
     
-    def rule_order(self, algorithm="randomfold"):
+    def rule_order(self, algorithm="maxreactionsupersets"):
         """
         Determine the ordering of all rules/folds.
 
@@ -457,7 +456,7 @@ class FoldMetabolism:
                            (Probably I want to just remove this kwarg and
                             always have this enabled...)
         """
-        valid_algorithms = ["randomfold", "randomrule", "maxreactions"]
+        valid_algorithms = ["randomfold", "randomrule", "maxreactions", "maxreactionsupersets"]
         if algorithm.lower() not in valid_algorithms:
             raise ValueError("algorithm must be one of %s"%valid_algorithms)
 
