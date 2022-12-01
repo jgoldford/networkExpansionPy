@@ -436,8 +436,9 @@ class FoldMetabolism:
         elif algorithm == "maxreactionsupersets":
             r_effects, n_rules_checked, equal_rule_dict, er_effects = self.loop_through_rules(current_folds, current_cpds, current_rns, remaining_rules)
             if len(r_effects) == 0:
-                next_rule = None
+                next_rule = frozenset()
                 r_effects[next_rule] = {"cpds":deepcopy(current_cpds), "rns":deepcopy(current_rns)}
+                print("NO R_EFFECTS REMAINING")
             else:
                 next_rule = random.choice(sorted(r_effects.keys()))
             return next_rule, r_effects[next_rule], n_rules_checked, len(equal_rule_dict) #, er_effects
@@ -539,9 +540,9 @@ class FoldMetabolism:
             ## Stop conditions
             if len(remaining_folds) == 0:
                 keepgoing = False
-            if next_rule == None:
+            if len(next_rule) == 0:
                 keepgoing == False
-            elif (fdata["cpds"] == current["cpds"]) and (fdata["rns"] == current["rns"]):
+            if (fdata["cpds"] == current["cpds"]) and (fdata["rns"] == current["rns"]):
                 keepgoing = False    
             else:
                 ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
