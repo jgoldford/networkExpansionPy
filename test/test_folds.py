@@ -309,6 +309,57 @@ class TestIndependentFunctions(unittest.TestCase):
 
         self.assertEqual(expected, nf.free_rules(current_folds, rule2rn))
 
+    def test_next_iter_possible_rules(self):
+        current_folds = {'spontaneous', '246', '210', '2007', '286'}
+        remaining_rules = {frozenset({'7579'}): {'R09126', 'R09983'},
+            frozenset({'7561'}): {'R03540'},
+            frozenset({'149'}): {'R11750'},
+            frozenset({'101', '812'}): {'R03546', 'R10079'},
+            frozenset({'315'}): {'R06973'},
+            frozenset({'4952', '4953', '602'}): {'R00490'},
+            frozenset({'4021'}): {'R02243'},
+            frozenset({'4952', '602'}): {'R11749'},
+            frozenset({'7507', '7546'}): {'R00485'},
+            frozenset({'7523'}): {'R02244'},
+            frozenset({'2003', '7574'}): {'R00224', 'R00636'},
+            frozenset({'7552'}): {'R00321'},
+            frozenset({'278', '604'}): {'LAO_FM'}}
+        current_rns = {'R00269',
+            'R00348',
+            'R01087',
+            'R02244',
+            'R07316',
+            'R08698',
+            'R11617',
+            'R12185'}
+
+#         expectd = equal super:  frozenset({frozenset({'7579'})})
+# equal sub	  frozenset({frozenset({'7523'})})
+# equal super:  frozenset({frozenset({'7561'})})
+# equal sub	  frozenset({frozenset({'7523'})})
+# equal super:  frozenset({frozenset({'4953', '4952', '602'})})
+# equal sub	  frozenset({frozenset({'7523'})})
+# equal super:  frozenset({frozenset({'7552'})})
+# equal sub	  frozenset({frozenset({'7523'})})
+# equal super:  frozenset({frozenset({'101', '812'})})
+# equal sub	  frozenset({frozenset({'7523'})})
+# equal super:  frozenset({frozenset({'7507', '7546'})})
+# equal sub	  frozenset({frozenset({'7523'})})
+# equal super:  frozenset({frozenset({'149'})})
+# equal sub	  frozenset({frozenset({'7523'})})
+# equal super:  frozenset({frozenset({'2003', '7574'})})
+# equal sub	  frozenset({frozenset({'7523'})})
+# equal super:  frozenset({frozenset({'4952', '602'})})
+# equal sub	  frozenset({frozenset({'7523'})})
+# equal super:  frozenset({frozenset({'315'})})
+# equal sub	  frozenset({frozenset({'7523'})})
+# equal super:  frozenset({frozenset({'4021'})})
+# equal sub	  frozenset({frozenset({'7523'})})
+# equal super:  frozenset({frozenset({'604', '278'})})
+# equal sub	  frozenset({frozenset({'7523'})})
+
+        equal_rule_groups = nf.next_iter_possible_rules(current["folds"], remaining_rules, current["rns"])
+
 # class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
 
 #     maxDiff = None ## allows full output of failed test differences

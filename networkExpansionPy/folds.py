@@ -55,6 +55,8 @@ def create_equal_rule_groups(rule2rn):
                 if v2 <= v:
                     if v2!=v:
                         # maps to the a strict subset of reactions
+                        # if k2==frozenset({'7523'}):
+                        #     print(v, v2)
                         strictsubsets.add(k2)
                         strictsubset_ks.add(k2)
                     else: # v2==v
@@ -110,8 +112,9 @@ def next_iter_possible_rules(current_folds, remaining_rules, current_rns):
             ]
     """
 
-    future_rule2rns = {k:(v | current_rns) for k,v in remaining_rules.items()}
+    future_rule2rns = {k:(v | current_rns) for k,v in remaining_rules.items() if len(v-current_rns)>0}
     equal_rule_groups = create_equal_rule_groups(future_rule2rns) ## discards any rules which are strict subsets of others...
+
     ## Remove current folds from each equivilent rule group
     for i in equal_rule_groups:
         i.equal_supersets = [frozenset(rule - current_folds) for rule in i.equal_supersets]
