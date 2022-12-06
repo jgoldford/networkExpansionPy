@@ -380,6 +380,7 @@ class FoldMetabolism:
         ## At this point we have all the ERs which are ever going to be checked
 
         ## If any of the ers give new reactions
+        ers_with_max_v = [] ## in case condition is false it won't be undefined
         if rule_enabling_new_rns_found:
             k_vcount = {k:len(v["rns"]) for k,v in er_effects.items()}
             max_v = max(k_vcount.values())

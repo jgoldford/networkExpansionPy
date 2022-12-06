@@ -333,32 +333,141 @@ class TestIndependentFunctions(unittest.TestCase):
             'R11617',
             'R12185'}
 
-#         expectd = equal super:  frozenset({frozenset({'7579'})})
-# equal sub	  frozenset({frozenset({'7523'})})
-# equal super:  frozenset({frozenset({'7561'})})
-# equal sub	  frozenset({frozenset({'7523'})})
-# equal super:  frozenset({frozenset({'4953', '4952', '602'})})
-# equal sub	  frozenset({frozenset({'7523'})})
-# equal super:  frozenset({frozenset({'7552'})})
-# equal sub	  frozenset({frozenset({'7523'})})
-# equal super:  frozenset({frozenset({'101', '812'})})
-# equal sub	  frozenset({frozenset({'7523'})})
-# equal super:  frozenset({frozenset({'7507', '7546'})})
-# equal sub	  frozenset({frozenset({'7523'})})
-# equal super:  frozenset({frozenset({'149'})})
-# equal sub	  frozenset({frozenset({'7523'})})
-# equal super:  frozenset({frozenset({'2003', '7574'})})
-# equal sub	  frozenset({frozenset({'7523'})})
-# equal super:  frozenset({frozenset({'4952', '602'})})
-# equal sub	  frozenset({frozenset({'7523'})})
-# equal super:  frozenset({frozenset({'315'})})
-# equal sub	  frozenset({frozenset({'7523'})})
-# equal super:  frozenset({frozenset({'4021'})})
-# equal sub	  frozenset({frozenset({'7523'})})
-# equal super:  frozenset({frozenset({'604', '278'})})
-# equal sub	  frozenset({frozenset({'7523'})})
+        ## [(i.equal_supersets,i.equal_subsets) for i in equal_rule_dict] probably need to reformat to sets
+        #  expected_equal_rule_groups = [([frozenset({'315'})], []),
+            # ([frozenset({'2003', '7574'})], []),
+            # ([frozenset({'278', '604'})], []),
+            # ([frozenset({'101', '812'})], []),
+            # ([frozenset({'4952', '602'})], []),
+            # ([frozenset({'210'})], [frozenset({'7507', '7546'})]),
+            # ([frozenset({'7561'})], []),
+            # ([frozenset({'7552'})], []),
+            # ([frozenset({'149'})], []),
+            # ([frozenset({'4021'})], []),
+            # ([frozenset({'7579'})], []),
+            # ([frozenset({'4952', '4953', '602'})], [])]
 
         equal_rule_groups = nf.next_iter_possible_rules(current["folds"], remaining_rules, current["rns"])
+
+    def test_loop_through_rules(self):
+
+        current_folds = {'2007', '246', '7523', 'spontaneous'}
+        current_cpds = {'C00001',
+            'C00009',
+            'C00011',
+            'C00012',
+            'C00014',
+            'C00022',
+            'C00023',
+            'C00026',
+            'C00028',
+            'C00030',
+            'C00033',
+            'C00036',
+            'C00038',
+            'C00042',
+            'C00048',
+            'C00058',
+            'C00069',
+            'C00070',
+            'C00071',
+            'C00080',
+            'C00122',
+            'C00149',
+            'C00150',
+            'C00160',
+            'C00161',
+            'C00175',
+            'C00205',
+            'C00209',
+            'C00238',
+            'C00282',
+            'C00283',
+            'C00288',
+            'C00305',
+            'C00311',
+            'C00383',
+            'C00417',
+            'C00940',
+            'C01127',
+            'C01330',
+            'C01335',
+            'C01384',
+            'C01528',
+            'C01563',
+            'C01732',
+            'C02218',
+            'C02341',
+            'C02362',
+            'C06232',
+            'C14818',
+            'C14819',
+            'C17023',
+            'C19609',
+            'C19806',
+            'C20679',
+            'C22155',
+            'Z00001',
+            'Z00002',
+            'Z00006',
+            'Z00015',
+            'Z00020',
+            'Z00029',
+            'Z00030',
+            'Z00033',
+            'Z00034',
+            'Z00053',
+            'Z00054',
+            'Z00055',
+            'Z00060',
+            'Z00062',
+            'Z00063',
+            'Z00064',
+            'Z00067',
+            'Z00069',
+            'Z00070'}
+        current_rns = {'R00269', 'R00348', 'R01087', 'R02244', 'R07316', 'R08698', 'R12185'}
+        remaining_rules = {frozenset({'7579'}): {'R09126', 'R09983'},
+            frozenset({'7561'}): {'R03540'},
+            frozenset({'149'}): {'R11750'},
+            frozenset({'101', '812'}): {'R03546', 'R10079'},
+            frozenset({'315'}): {'R06973'},
+            frozenset({'210'}): {'R00485', 'R11617'},
+            frozenset({'4952', '4953', '602'}): {'R00490'},
+            frozenset({'4021'}): {'R02243'},
+            frozenset({'4952', '602'}): {'R11749'},
+            frozenset({'7507', '7546'}): {'R00485'},
+            frozenset({'286'}): {'R02244'},
+            frozenset({'2003', '7574'}): {'R00224', 'R00636'},
+            frozenset({'7552'}): {'R00321'},
+            frozenset({'278', '604'}): {'LAO_FM'}}
+
+        expected_r_effects_keys = dict_keys([frozenset({'210'}), frozenset({'7561'}), frozenset({'7552'}), frozenset({'4021'})])
+        expected_n_rules_checked = 
+        ## [(i.equal_supersets,i.equal_subsets) for i in equal_rule_dict] probably need to reformat to sets
+        expected_equal_rule_dict = [([frozenset({'315'})], []),
+            ([frozenset({'2003', '7574'})], []),
+            ([frozenset({'278', '604'})], []),
+            ([frozenset({'101', '812'})], []),
+            ([frozenset({'4952', '602'})], []),
+            ([frozenset({'210'})], [frozenset({'7507', '7546'})]),
+            ([frozenset({'7561'})], []),
+            ([frozenset({'7552'})], []),
+            ([frozenset({'149'})], []),
+            ([frozenset({'4021'})], []),
+            ([frozenset({'7579'})], []),
+            ([frozenset({'4952', '4953', '602'})], [])]
+        
+        ## [(i.equal_supersets,i.equal_subsets) for i in er_effects] probably need to reformat to sets
+        expected_er_effects = [([frozenset({'315'})], []),
+            ([frozenset({'210'})], [frozenset({'7507', '7546'})]),
+            ([frozenset({'7561'})], []),
+            ([frozenset({'7552'})], []),
+            ([frozenset({'149'})], []),
+            ([frozenset({'4021'})], []),
+            ([frozenset({'7579'})], [])]
+
+        r_effects, n_rules_checked, equal_rule_dict, er_effects = fm.loop_through_rules(current["folds"], current["cpds"], current["rns"], remaining_rules)
 
 # class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
 
