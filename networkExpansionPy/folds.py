@@ -354,23 +354,35 @@ class FoldMetabolism:
         all_rule_sizes = set()
         for er in equal_rule_dict:
             all_rule_sizes |= set(er.equal_supersets_by_size.keys())
-            all_rule_sizes |= set(er.equal_subsets_by_size.keys())
+            all_rule_sizes |= set(er.equal_subsets_by_size.keys())        
 
         n_rules_checked = 0 # for metadata
         rule_enabling_new_rns_found = False
         rsize_enabled_new_rns_founds = 0
         er_effects = dict()
         for rsize in sorted(all_rule_sizes):
+            print("")
+            print("rsize: ",rsize)
             for d in equal_rule_dict:
-                if (rsize in d.equal_supersets_by_size) or (rsize in d.equal_subsets_by_size) and (d not in er_effects):
-                    superset_size_key = sorted(d.equal_supersets_by_size.keys())[0] # doesn't matter which superset we expand, just take the first. this is needed in case the rsize of a subset isn't in a superset
-                    rule = d.equal_supersets_by_size[superset_size_key][0] 
-                    _fdict = dict()
-                    _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(rule, current_folds, current_cpds)
-                    er_effects[d] = _fdict
-                    n_rules_checked+=1
-                    if len(_fdict["rns"] - current_rns) > 0:
-                        rule_enabling_new_rns_found = True                   
+                # print(f"{d.equal_supersets_by_size=}")
+                # print(f"{d.equal_subsets_by_size=}")
+                # print(f"{er_effects=}")
+
+                if (rsize in d.equal_supersets_by_size) or (rsize in d.equal_subsets_by_size):
+                    if d not in er_effects:
+                        # print("******")
+                        # print(d)
+                        # print(sorted(d.equal_supersets_by_size))
+                        superset_size_key = sorted(d.equal_supersets_by_size.keys())[0] # doesn't matter which superset we expand, just take the first. this is needed in case the rsize of a subset isn't in a superset
+                        rule = d.equal_supersets_by_size[superset_size_key][0] 
+                        _fdict = dict()
+                        _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(rule, current_folds, current_cpds)
+                        er_effects[d] = _fdict
+                        n_rules_checked+=1
+                        print("n_rules_checked: ", n_rules_checked)
+                        if len(_fdict["rns"] - current_rns) > 0:
+                            print("rule enabling new reactions found! ", rule)
+                            rule_enabling_new_rns_found = True                   
 
             ## Don't look for longer rules if shorter rules enable new reactions
             if rule_enabling_new_rns_found:
@@ -378,6 +390,9 @@ class FoldMetabolism:
                 break   
 
         ## At this point we have all the ERs which are ever going to be checked
+        # print("er effects d.equal_supersets")
+        # for d in er_effects.keys():
+        #     print(d.equal_supersets)
 
         ## If any of the ers give new reactions
         ers_with_max_v = [] ## in case condition is false it won't be undefined
@@ -385,6 +400,8 @@ class FoldMetabolism:
             k_vcount = {k:len(v["rns"]) for k,v in er_effects.items()}
             max_v = max(k_vcount.values())
             ers_with_max_v = [k for k,v in k_vcount.items() if v==max_v]
+
+        print("ers_with_max_v: ", [d.equal_supersets for d in ers_with_max_v])
 
         ## SOME TESTING BY MANUALLY FORCING THIS TO 2
         # rsize_enabled_new_rns_founds = 2
@@ -397,17 +414,27 @@ class FoldMetabolism:
             for size, rules in er.equal_supersets_by_size.items():
                 if size <= rsize_enabled_new_rns_founds:
                     for rule in rules:
-                        r_effects[rule] = deepcopy(er_effects[er])
+                        if rule not in r_effects:
+                            r_effects[rule] = deepcopy(er_effects[er])
+                            print("new r_effect: ", rule)
+        
+        for er in ers_with_max_v:
             ## For each strictsubset of the initial expansion, check expansion to see if it reaches the same max_v
             for size, rules in er.equal_subsets_by_size.items():
+                # print(f"{size=}")
+                # print(f"{rules=}")
                 if size <= rsize_enabled_new_rns_founds:
+                    # print(f"{rsize_enabled_new_rns_founds=}")
+                    # print(f"{size=}")
+                    # print(f"{rules=}")     
                     for rule in rules:
-                        n_rules_checked+=1
-                        _fdict = dict()
-                        _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(rule, current_folds, current_cpds)
-                        if len(_fdict["rns"]) == max_v:
-                            r_effects[rule] = _fdict
-
+                        if rule not in r_effects:
+                            _fdict = dict()
+                            _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(rule, current_folds, current_cpds)
+                            n_rules_checked+=1
+                            print("n_rules_checked: ", n_rules_checked)
+                            if len(_fdict["rns"]) == max_v:
+                                r_effects[rule] = _fdict
         ## r_effects now only fills with rules which are at LEAST max_v, and can include subsets so long as their superset provided max_v new reactions
         return r_effects, n_rules_checked, equal_rule_dict, er_effects
 
