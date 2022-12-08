@@ -34,40 +34,40 @@ def subset_rule2rn_from_folds(folds, rule2rn):
     """
     return {k:v for k,v in rule2rn.items() if k <= set(folds)}
 
-def create_equal_rule_groups(rule2rn):
-    """
-    Returns a set of equivilent rule collections.
+# def create_equal_rule_groups(rule2rn):
+#     """
+#     Returns a set of equivilent rule collections.
 
-    Collections and the rules they contain are each frozensets.
+#     Collections and the rules they contain are each frozensets.
 
-    :param rule2rn: dict of rule:rns to create equal rule groups from
-    :return: set of frozensets (i.e. groups of equivilent rules) of frozensets (i.e. rules) 
-    """
+#     :param rule2rn: dict of rule:rns to create equal rule groups from
+#     :return: set of frozensets (i.e. groups of equivilent rules) of frozensets (i.e. rules) 
+#     """
 
-    strictsubsets = set()
-    # equal_groups = set()
-    equal_groups = []
-    for k, v in rule2rn.items():
-        equal_ks = {k}
-        strictsubset_ks = set()
-        for k2, v2 in rule2rn.items():
-            if k != k2:
-                if v2 <= v:
-                    if v2!=v:
-                        # maps to the a strict subset of reactions
-                        # if k2==frozenset({'7523'}):
-                        #     print(v, v2)
-                        strictsubsets.add(k2)
-                        strictsubset_ks.add(k2)
-                    else: # v2==v
-                        # maps to the exact same reactions
-                        equal_ks.add(k2) 
+#     strictsubsets = set()
+#     # equal_groups = set()
+#     equal_groups = []
+#     for k, v in rule2rn.items():
+#         equal_ks = {k}
+#         strictsubset_ks = set()
+#         for k2, v2 in rule2rn.items():
+#             if k != k2:
+#                 if v2 <= v:
+#                     if v2!=v:
+#                         # maps to the a strict subset of reactions
+#                         # if k2==frozenset({'7523'}):
+#                         #     print(v, v2)
+#                         strictsubsets.add(k2)
+#                         strictsubset_ks.add(k2)
+#                     else: # v2==v
+#                         # maps to the exact same reactions
+#                         equal_ks.add(k2) 
         
-        er = EquivilentRule(equal_ks, strictsubset_ks)
-        if er not in equal_groups:
-            equal_groups.append(er)
+#         er = EquivilentRule(equal_ks, strictsubset_ks)
+#         if er not in equal_groups:
+#             equal_groups.append(er)
 
-    return set([i for i in equal_groups if not i.equal_supersets & strictsubsets]) ## ignore equivilent rules that have supersets
+#     return set([i for i in equal_groups if not i.equal_supersets & strictsubsets]) ## ignore equivilent rules that have supersets
 
 def sort_equal_rule_groups(equal_rule_groups):
     """
@@ -185,6 +185,12 @@ def update_iteration_dict(iteration_dict, current, iteration):
 
 ########################################################################################################################
 ########################################################################################################################
+# class Rule:
+#     def __init__(self, rule, rns):
+#         self.rule = rule 
+#         self.rns = rns 
+#         self.size = len(rule)
+
 # class EquivilentRule:
 #     """
 #     """
@@ -332,6 +338,66 @@ class FoldMetabolism:
         cx,rx = self.fold_expand(potential_rule2rns, current_cpds)
 
         return potential_rule2rns, cx, rx
+
+    def loop_through_rules(self):
+        ## future_rule2rns excludes rules which don't lead to new reactions
+        future_rule2rns = {k:(v | current_rns) for k,v in remaining_rules.items() if len(v-current_rns)>0}
+        rule_sizes = sorted(set([len(i) for i in future_rule2rns]))
+
+        ## Organizes rules by size
+        future_rule2rns_by_size = {size:dict() for size in rule_sizes}
+        for rule, rns in future_rule2rns.items():
+            future_rule2rns_by_size[len(rule)][rule]=rns
+
+        n_rules_checked = 0
+        n_rules_skipped = 0
+        max_r_effects = dict()
+        max_v = 0
+        rn_sets_enabling_less_than_max = set()
+        for size in rule_sizes:
+            ## go through each rule, sorted by maximum rule size
+            ## this way i can skip rules if the bigger rule produces no rew reactions, or less than max reactions
+            future_rule2rns_by_size_sorted = sorted(future_rule2rns_by_size[size], key=lambda k: len(future_rule2rns_by_size[size][k]), reverse=True)
+            for rule in future_rule2rns_by_size_sorted:
+                rns = future_rule2rns[rule]
+                
+                ## Shortcut expansion if the rule only maps to rns which are known not to expand to max
+                skip_expansion=False
+                for bum_rset in rn_sets_enabling_less_than_max:
+                    if rns <= bum_rset:
+                        skip_expansion=True
+                        n_rules_skipped+=1
+                        break
+                
+                ## Expansion
+                if not skip_expansion:
+                    _fdict = dict()
+                    _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(rule, current_folds, current_cpds)
+
+                    n_rules_checked+=1
+                    n_new_rns = len(_fdict["rns"] - current_rns)
+                    print("n_rules_checked: ", n_rules_checked)
+                    if n_new_rns > 0:
+                        print("rule enabling new reactions found! ", rule)                    
+                    
+                    if n_new_rns == max_v:
+                        max_r_effects[rule] = _fdict
+                    elif n_new_rns > max_v:
+                        max_v = n_new_rns
+                        for rule in max_r_effects:
+                            rn_sets_enabling_less_than_max.add(frozenset(max_r_effects["rns"]))
+                        max_r_effects = dict()
+                        max_r_effects[rule] = _fdict
+                    else: # n_new_rns < max_v
+                        rn_sets_enabling_less_than_max.add(frozenset(_fdict["rns"]))
+
+            ## Don't look for longer rules if shorter rules enable new reactions
+            if len(max_r_effects)>0:
+                break
+
+        return max_r_effects, n_rules_checked, n_rules_skipped
+
+
 
     # def loop_through_rules(self, current_folds, current_cpds, current_rns, remaining_rules):
     #     """
