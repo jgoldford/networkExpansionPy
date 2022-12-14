@@ -410,7 +410,7 @@ def example_main():
     rn2rules_path = rn2rules_db.iloc[4]["OUTPUT_PATH"]
     rn2rules = pd.read_pickle(rn2rules_path)
 
-    fold_independent_rns = set()
+    fold_independent_rns = set(metabolism.network["rn"]) - set(rn2rules)
     foldrules = nf.FoldRules(rn2rules, fold_independent_rns)
 
     ## Inititalize fold metabolism
