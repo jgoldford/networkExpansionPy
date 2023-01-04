@@ -2,11 +2,14 @@ README.md
 setup.py
 networkExpansionPy/__init__.py
 networkExpansionPy/folds.py
+networkExpansionPy/foldsOld.py
 networkExpansionPy/kegg.py
 networkExpansionPy/lib.py
+networkExpansionPy/thermo.py
 networkExpansionPy.egg-info/PKG-INFO
 networkExpansionPy.egg-info/SOURCES.txt
 networkExpansionPy.egg-info/dependency_links.txt
 networkExpansionPy.egg-info/top_level.txt
 test/__init__.py
+test/test_folds.py
 test/test_lib.py

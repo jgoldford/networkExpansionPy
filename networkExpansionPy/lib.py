@@ -502,10 +502,10 @@ class GlobalMetabolicNetwork:
 
         # add a new term that uses sparse matrix multiplication for R and P to zero out reactions are that are not accessible
         if reaction_mask is not None:
-        	reaction_mask = self.initialize_reaction_vector(reaction_mask)
-        	reaction_mask = csr_matrix(np.diag(reaction_mask))
-        	P = P*reaction_mask
-        	R = R*reaction_mask
+            reaction_mask = self.initialize_reaction_vector(reaction_mask)
+            reaction_mask = csr_matrix(np.diag(reaction_mask))
+            P = P*reaction_mask
+            R = R*reaction_mask
 
         x0 = csr_matrix(x0)
         x0 = x0.transpose()
@@ -745,33 +745,33 @@ class GlobalMetabolicNetwork:
 
 
     def ne_output_to_graph(self,cpds,rxns):
-	    # build a network constructing metabolites from prior iteration to connecting subsequent iteration
-	    # input: cpds (rxns) is a dict with compound id (reaction id) as the key, and iteration as the value
-	    # output: dataframe with target and source node and iteration for  
+        # build a network constructing metabolites from prior iteration to connecting subsequent iteration
+        # input: cpds (rxns) is a dict with compound id (reaction id) as the key, and iteration as the value
+        # output: dataframe with target and source node and iteration for  
 
-	    graph = {'target': [], 'source': [], 'iteration':[]}
-	    maxIter = np.array(list(cpds.values())).max()
-	    
-	    cpd_iter_df = pd.DataFrame({'cid': [x[0] for x in cpds.items()],'iter': [x[1] for x in cpds.items()]})
+        graph = {'target': [], 'source': [], 'iteration':[]}
+        maxIter = np.array(list(cpds.values())).max()
+        
+        cpd_iter_df = pd.DataFrame({'cid': [x[0] for x in cpds.items()],'iter': [x[1] for x in cpds.items()]})
 
-	    for i in range(maxIter,0,-1):
-	        molecules = [x[0] for x in cpds.items() if x[1] == i]
-	        reactions = [x[0] for x in rxns.items() if x[1] == i]
-	        reactions = self.network.set_index(['rn','direction']).loc[reactions]
-	        for molecule in molecules:
-	            # reactions
-	            # find any reactions that produce this metabolite
-	            r_sample = reactions[ ( reactions.cid == molecule) & (reactions.s>0)].sample(1)
-	            # find metabolite in reaction that was produced in previous iteration
-	            r_sample_cpds = reactions.loc[r_sample.index].set_index('cid').join(cpd_iter_df.set_index('cid'))
-	            r_sample_cpds = r_sample_cpds[r_sample_cpds.iter == i-1].sample(1)
-	            molecules_origin = r_sample_cpds.index.tolist()[0]
-	            graph['target'].append(molecule)
-	            graph['source'].append(molecules_origin)
-	            graph['iteration'].append(i)
+        for i in range(maxIter,0,-1):
+            molecules = [x[0] for x in cpds.items() if x[1] == i]
+            reactions = [x[0] for x in rxns.items() if x[1] == i]
+            reactions = self.network.set_index(['rn','direction']).loc[reactions]
+            for molecule in molecules:
+                # reactions
+                # find any reactions that produce this metabolite
+                r_sample = reactions[ ( reactions.cid == molecule) & (reactions.s>0)].sample(1)
+                # find metabolite in reaction that was produced in previous iteration
+                r_sample_cpds = reactions.loc[r_sample.index].set_index('cid').join(cpd_iter_df.set_index('cid'))
+                r_sample_cpds = r_sample_cpds[r_sample_cpds.iter == i-1].sample(1)
+                molecules_origin = r_sample_cpds.index.tolist()[0]
+                graph['target'].append(molecule)
+                graph['source'].append(molecules_origin)
+                graph['iteration'].append(i)
 
-	    graph = pd.DataFrame(graph)
-	    return graph
+        graph = pd.DataFrame(graph)
+        return graph
 
     def save(self,name):
         path_to_save = asset_path + '/metabolic_networks/' + name + ".pkl"
@@ -779,6 +779,7 @@ class GlobalMetabolicNetwork:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def rxns2tuple(self,rn_list):
-    	t = self.network[self.network.rn.isin(rn_list)][['rn','direction']].drop_duplicates()
-    	rn_list_tuple = list(zip(t.rn.tolist(),t.direction.tolist()))
-    	return rn_list_tuple
+        t = self.network[self.network.rn.isin(rn_list)][['rn','direction']].drop_duplicates()
+        rn_list_tuple = list(zip(t.rn.tolist(),t.direction.tolist()))
+        return rn_list_tuple
+    
