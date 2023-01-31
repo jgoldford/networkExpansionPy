@@ -180,7 +180,6 @@ class FoldMetabolism:
         potential_fold_set = (current_folds | set(rule))
         potential_rule2rns = subset_rule2rn_from_folds(potential_fold_set, self.scope_rules2rn)
         cx,rx = self.fold_expand(potential_rule2rns, current_cpds)
-
         return potential_rule2rns, cx, rx
 
     def loop_through_rules(self, current_cpds, current_rns, current_folds, remaining_rules):
@@ -216,6 +215,7 @@ class FoldMetabolism:
                 
                 ## Expansion
                 if not skip_expansion:
+                    
                     _fdict = dict()
                     _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(rule, current_folds, current_cpds)
 
@@ -269,7 +269,7 @@ class FoldMetabolism:
             return next_rule, _fdict, 1, 0
             
         elif algorithm == "maxreactionsupersets":
-            r_effects, n_rules_checked, n_rules_skipped = self.loop_through_rules(current_folds, current_cpds, current_rns, remaining_rules)
+            r_effects, n_rules_checked, n_rules_skipped = self.loop_through_rules(current_cpds, current_rns, current_folds, remaining_rules)
             if len(r_effects) == 0:
                 next_rule = frozenset()
                 r_effects[next_rule] = {"cpds":deepcopy(current_cpds), "rns":deepcopy(current_rns)}

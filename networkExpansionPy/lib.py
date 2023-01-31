@@ -619,25 +619,25 @@ class GlobalMetabolicNetwork:
             x,y = netExp(R,P,x0,b)
             
             if algorithm.lower() == 'naive':
-            	x,y = netExp(R,P,x0,b)
-            	if x.toarray().sum() > 0:
-                	cidx = np.nonzero(x.toarray().T[0])[0]
-                	compounds = [self.idx_to_cid[i] for i in cidx]
-            	else:
-                	compounds = []
+                x,y = netExp(R,P,x0,b)
+                if x.toarray().sum() > 0:
+                    cidx = np.nonzero(x.toarray().T[0])[0]
+                    compounds = [self.idx_to_cid[i] for i in cidx]
+                else:
+                    compounds = []
                 
-            	if y.toarray().sum() > 0:
-                	ridx = np.nonzero(y.toarray().T[0])[0]
-                	reactions = [self.idx_to_rid[i] for i in ridx]
-            	else:
-                	reactions = [];
-        		
-        	elif algorithm.lower() == 'trace':
-            	X,Y = netExp_trace(R,P,x0,b)
-            	compounds = self.create_iteration_dict(X,self.idx_to_cid)
-            	reactions = self.create_iteration_dict(Y,self.idx_to_rid)
-        	else:
-           	 	raise ValueError('please define algorithm (trace or naive)')
+                if y.toarray().sum() > 0:
+                    ridx = np.nonzero(y.toarray().T[0])[0]
+                    reactions = [self.idx_to_rid[i] for i in ridx]
+                else:
+                    reactions = [];
+                
+            elif algorithm.lower() == 'trace':
+                X,Y = netExp_trace(R,P,x0,b)
+                compounds = self.create_iteration_dict(X,self.idx_to_cid)
+                reactions = self.create_iteration_dict(Y,self.idx_to_rid)
+            else:
+                    raise ValueError('please define algorithm (trace or naive)')
 
             compoundScopes.append(compounds)
             reactionScopes.append(reactions)
