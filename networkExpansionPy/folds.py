@@ -278,6 +278,55 @@ class FoldMetabolism:
                 next_rule = random.choice(sorted(r_effects.keys()))
             return next_rule, r_effects[next_rule], n_rules_checked, n_rules_skipped #, er_effects
 
+        ## Assuming you start with all scope compounds in the seed set, pick fold order based on fold which enables the most reactions
+        elif algorithm == "allcompoundsseedmaxreactions":
+            # for r in remaining_rules:
+            #     potential_fold_set = (current_folds | set(rule))
+            #     potential_rule2rns = subset_rule2rn_from_folds(potential_fold_set, self.scope_rules2rn)
+
+            future_rule2rns = {k:(v | current_rns) for k,v in remaining_rules.items() if len(v-current_rns)>0}
+            rule_sizes = sorted(set([len(i) for i in future_rule2rns]))
+
+            ## Organizes rules by size
+            future_rule2rns_by_size = {size:dict() for size in rule_sizes}
+            for rule, rns in future_rule2rns.items():
+                future_rule2rns_by_size[len(rule)][rule]=rns
+
+            for size in rule_sizes:
+                future_rule2rns_by_size_sorted = sorted(future_rule2rns_by_size[size], key=lambda k: len(future_rule2rns_by_size[size][k]), reverse=True)
+                # future_rule2rns[rule] for rule in future_rule2rns_by_size_sorted:
+                    # rns = future_rule2rns[rule]
+
+
+            ## Don't look for longer rules if shorter rules enable new reactions
+            # if len(max_r_effects)>0:
+            #     break
+
+        ## picks folds maximizing the number of rules
+        elif algorithm == "allcompoundsseedmaxrules":
+
+            rules_minus_current_folds = {k-current_folds:v for k,v in remaining_rules.items()}
+            rule_sizes = sorted(set([len(i) for i in rules_minus_current_folds]))
+            # print(rule_sizes)
+            ## Do we still want rule to be added even if it only maps to reactions which are already in the network?
+            ## case 1: want to find rule regardless of it mapping to reactions already in the network
+
+            ## case 2: want to find rule only if it maps to reactions not in the network
+            # pprint(rules_minus_current_folds)
+
+            ## pick fold that immeasiately enables the most rules 
+            fold2activatedRuleCounter = Counter([f for k in rules_minus_current_folds for f in k if len(k)==min(rule_sizes)])
+            fold2activatedRuleMaxValue = max(fold2activatedRuleCounter.values())
+            fold2activatedRuleMaxFold = [k for k,v in fold2activatedRuleCounter.items() if v==fold2activatedRuleMaxValue]
+            print(fold2activatedRuleMaxFold)
+            next_rule = random.choice(sorted(r_effects.keys()))
+
+            ## need to make a conversion between fold2rule and rule2fold
+
+        ## Need to choose an option that picks folds which maximize the number of rules
+        # elif algorithm == "maxrules":
+        #     blah blah blah
+
         # elif algorithm == "maxreactions":
         #     r_effects, n_rules_checked, n_equal_rule_groups = self.loop_through_rules(current_folds, current_cpds, current_rns)
     
@@ -292,7 +341,7 @@ class FoldMetabolism:
                            (Probably I want to just remove this kwarg and
                             always have this enabled...)
         """
-        valid_algorithms = ["randomfold", "randomrule", "maxreactions", "maxreactionsupersets"]
+        valid_algorithms = ["randomfold", "randomrule", "maxreactions", "maxreactionsupersets", "allcompoundsseedmaxreactions", "allcompoundsseedmaxrules"]
         if algorithm.lower() not in valid_algorithms:
             raise ValueError("algorithm must be one of %s"%valid_algorithms)
 
