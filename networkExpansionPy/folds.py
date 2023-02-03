@@ -76,6 +76,47 @@ class FoldRules:
         self.folds = set([i for fs in self.rule2rns.keys() for i in fs]) ## all folds
         self.fold_independent_rns = fold_independent_rns
 
+class Rule:
+
+    id_iter = itertools.count()
+
+    def __init__(self,rn,foldset):
+        self.id = next(self.id_iter)
+        self.rn = rn
+        self.foldset = foldset
+
+    def __repr__(self):
+        return "id:\t\t{0} \nrn:\t\t{1} \nfoldset:\t{2}".format(self.id, self.rn, self.foldset)
+
+class Rules:
+
+    def __init__(self,rules:list):
+        self.rules = rules
+
+    def __repr__(self):
+        return "[\n"+",\n".join([str(i) for i in self.rules])+"]"
+
+    @classmethod
+    def from_rn2rules(cls, rn2rules):
+        rules = list()
+        for rn, fs_set in rn2rules.items():
+            for fs in fs_set:
+                rules.append(Rule(rn, fs))
+
+        return cls(rules)
+
+    def rns(self):
+        return set([r.rn for r in self.rules])
+
+    def folds(self):
+        return set([f for r in self.rules for f in r.foldset])
+
+    def subset_from_rns(self, rns):
+        return Rules([r for r in self.rules if r.rn in rns])
+
+    def subset_from_folds(self, folds):
+        return Rules([r for r in self.rules if r.foldset<=folds])
+
 class FoldMetabolism:
     ## Rename to something like FoldScope?
     """
