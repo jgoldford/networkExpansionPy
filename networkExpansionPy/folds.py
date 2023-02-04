@@ -55,26 +55,26 @@ def update_iteration_dict(iteration_dict, current, iteration):
 
 ########################################################################################################################
 ########################################################################################################################
-class FoldRules:
-    """
-    Stores how fold rules and reactions map to each other, and which reactions are independent of folds.
+# class FoldRules:
+#     """
+#     Stores how fold rules and reactions map to each other, and which reactions are independent of folds.
 
-    Invariant to seed compounds, seed folds, etc. This is the universe of possible fold rules. 
-    """
+#     Invariant to seed compounds, seed folds, etc. This is the universe of possible fold rules. 
+#     """
 
-    def __init__(self, rn2rules, fold_independent_rns):
-        """
-        Construct fold rules from an `rn2rules` dictionary, and a set of `fold_independent_rns`.
+#     def __init__(self, rn2rules, fold_independent_rns):
+#         """
+#         Construct fold rules from an `rn2rules` dictionary, and a set of `fold_independent_rns`.
 
-        :param rn2rules: dict of rn:{rules}, where rules are frozensets of folds
-        :param fold_independent_rns: a set of reactions which can occur without folds
-        """
+#         :param rn2rules: dict of rn:{rules}, where rules are frozensets of folds
+#         :param fold_independent_rns: a set of reactions which can occur without folds
+#         """
 
-        self.rn2rules = rn2rules ## all rns to fold rules
-        self.rule2rns = rule2rn(rn2rules) ## all fold rules to rns
-        self.rns = set(rn2rules.keys()) ## reactions in fold network only
-        self.folds = set([i for fs in self.rule2rns.keys() for i in fs]) ## all folds
-        self.fold_independent_rns = fold_independent_rns
+#         self.rn2rules = rn2rules ## all rns to fold rules
+#         self.rule2rns = rule2rn(rn2rules) ## all fold rules to rns
+#         self.rns = set(rn2rules.keys()) ## reactions in fold network only
+#         self.folds = set([i for fs in self.rule2rns.keys() for i in fs]) ## all folds
+#         self.fold_independent_rns = fold_independent_rns
 
 class Rule:
 
@@ -88,7 +88,7 @@ class Rule:
     def __repr__(self):
         return "id:\t\t{0} \nrn:\t\t{1} \nfoldset:\t{2}".format(self.id, self.rn, self.foldset)
 
-class Rules:
+class FoldRules:
 
     def __init__(self,rules:list):
         self.rules = rules
@@ -123,7 +123,7 @@ class FoldMetabolism:
     A class to do fold expansion from a metabolism, foldrules, and seeds.
     """
 
-    def __init__(self, metabolism, foldrules, preexpansion=False):
+    def __init__(self, metabolism, foldrules, fold_independent_rns, preexpansion=False):
         """
         Calculates expansion scope after seed compounds are defined. 
 
@@ -135,6 +135,7 @@ class FoldMetabolism:
         self._m = metabolism ## GlobalMetabolicNetwork object
         self._f = foldrules # FoldRules object
 
+        self.fold_independent_rns = None
         self.seed_folds = None
         self._seed_cpds = None
 
@@ -174,8 +175,9 @@ class FoldMetabolism:
         if (self._seed_cpds == None) or (self._seed_cpds != seed_cpds):
             self._seed_cpds = seed_cpds 
             self.scope_cpds, self.scope_rns = self.calculate_scope(self._seed_cpds)
-            self.scope_rn2rules = {k:v for k,v in self.f.rn2rules.items() if k in self.scope_rns}
-            self.scope_rules2rn = rule2rn(self.scope_rn2rules)
+            self.scope_rules = self.f.rules.subset_from_rns(self.scope_rns)
+            # self.scope_rn2rules = {k:v for k,v in self.f.rn2rules.items() if k in self.scope_rns}
+            # self.scope_rules2rn = rule2rn(self.scope_rn2rules)
             self.scope_folds = set([i for fs in self.scope_rules2rn.keys() for i in fs])
 
         else:
@@ -370,6 +372,14 @@ class FoldMetabolism:
 
         # elif algorithm == "maxreactions":
         #     r_effects, n_rules_checked, n_equal_rule_groups = self.loop_through_rules(current_folds, current_cpds, current_rns)
+
+    class Metadata:
+
+        def __init__(self):
+            self.runtime = dict()
+            self.n
+    
+
     
     def rule_order(self, algorithm="maxreactionsupersets"):
         """
@@ -494,17 +504,18 @@ def example_main():
     metabolism = pd.read_pickle(metabolism_path)
     
     ## Load fold rules
-    rn2rules_db_path = PurePath("data", "rn2fold", "_db.pkl")
-    rn2rules_db = pd.read_pickle(rn2rules_db_path)
+    # rn2rules_db_path = PurePath("data", "rn2fold", "_db.pkl")
+    # rn2rules_db = pd.read_pickle(rn2rules_db_path)
 
-    rn2rules_path = rn2rules_db.iloc[4]["OUTPUT_PATH"]
+    # rn2rules_path = rn2rules_db.iloc[4]["OUTPUT_PATH"]
+    # rn2rules = pd.read_pickle(rn2rules_path)
+    rn2rules_path = PurePath("data", "rn2fold", "rn2rules_v.pkl")
     rn2rules = pd.read_pickle(rn2rules_path)
+    foldrules = nf.FoldRules(rn2rules)
 
-    fold_independent_rns = set(metabolism.network["rn"]) - set(rn2rules)
-    foldrules = nf.FoldRules(rn2rules, fold_independent_rns)
-
+    fold_independent_rns = set(metabolism.network["rn"]) - foldrules.rns()
     ## Inititalize fold metabolism
-    fm = nf.FoldMetabolism(metabolism, foldrules)
+    fm = nf.FoldMetabolism(metabolism, foldrules, fold_independent_rns)
 
     seed_cpds_path = PurePath("data", "josh", "seed_set.csv")
     fm.seed_cpds = set((pd.read_csv(seed_cpds_path)["ID"]))
