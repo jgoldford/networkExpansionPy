@@ -92,6 +92,8 @@ class FoldRules:
 
     def __init__(self,rules:list):
         self.rules = rules
+        self.rn2rule = self.rn2rule()
+        self.fs2rule = self.fs2rule()
 
     def __repr__(self):
         return "[\n"+",\n".join([str(i) for i in self.rules])+"]"
@@ -112,10 +114,18 @@ class FoldRules:
         return set([f for r in self.rules for f in r.foldset])
 
     def subset_from_rns(self, rns):
-        return Rules([r for r in self.rules if r.rn in rns])
+        # return Rules([r for r in self.rules if r.rn in rns])
+        return Rules([self.rn2rule[r] for r in rns])
 
     def subset_from_folds(self, folds):
         return Rules([r for r in self.rules if r.foldset<=folds])
+        # return Rules([self.fs2rule[r] for r in rns])
+
+    def rn2rule(self):
+        return {r.rn:r for r in self.rules}
+
+    def fs2rule(self):
+        return {r.foldset:r for r in self.rules}
 
 class FoldMetabolism:
     ## Rename to something like FoldScope?
@@ -224,6 +234,10 @@ class FoldMetabolism:
         potential_rule2rns = subset_rule2rn_from_folds(potential_fold_set, self.scope_rules2rn)
         cx,rx = self.fold_expand(potential_rule2rns, current_cpds)
         return potential_rule2rns, cx, rx
+
+    ######
+
+    ######
 
     def loop_through_rules(self, current_cpds, current_rns, current_folds, remaining_rules):
         ## future_rule2rns excludes rules which don't lead to new reactions
