@@ -5,6 +5,7 @@ import timeit
 from pprint import pprint
 from collections import Counter
 import random
+import itertools
 
 asset_path = PurePath(__file__).parent / "assets"
 
@@ -94,6 +95,7 @@ class FoldRules:
         self.rules = rules
         self.rn2rule = self.rn2rule()
         self.fs2rule = self.fs2rule()
+        self.folds = self.folds()
 
     def __repr__(self):
         return "[\n"+",\n".join([str(i) for i in self.rules])+"]"
@@ -112,6 +114,9 @@ class FoldRules:
 
     def folds(self):
         return set([f for r in self.rules for f in r.foldset])
+
+    def foldsets(self):
+        return set()
 
     def subset_from_rns(self, rns):
         # return Rules([r for r in self.rules if r.rn in rns])
@@ -236,6 +241,25 @@ class FoldMetabolism:
         return potential_rule2rns, cx, rx
 
     ######
+
+    def fold_expand2(self, fold_rns, current_cpds):
+
+        rn_tup_set = set(self.m.rxns2tuple(fold_rns | self.fold_independent_rns))
+        cx,rx = self.m.expand(current_cpds, reaction_mask=rn_tup_set)
+        return set(cx), set([i[0] for i in rx])
+
+
+    def effect_per_rule_or_fold2(self, rule, current_folds, current_cpds):
+
+        potential_fold_set = (current_folds | set(rule))
+        potential_rules = self.f.subset_from_folds(potential_fold_set)
+        cx,rx = self.fold_expand2(potential_rules.rns, current_cpds)
+        return cx, rx
+
+
+    def loop_through_rules2(self):
+
+        potential_ruleset = self.effect_per_rule_or_fold
 
     ######
 
