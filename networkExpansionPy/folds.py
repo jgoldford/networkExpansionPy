@@ -181,8 +181,8 @@ class FoldMetabolism:
         self.scope_cpds = None
         self.scope_rns = None
         self.scope_folds = None
-        self.scope_rules2rn = None
-        self.scope_rn2rules = None
+        # self.scope_rules2rn = None
+        # self.scope_rn2rules = None
 
     ## Disallow changing metabolism or foldrules after initialization b/c no setter
     @property 
@@ -281,16 +281,48 @@ class FoldMetabolism:
         return cx, rx
 
 
-    def loop_through_rules2(self, current_cpds, current_rns, current_folds, remaining_rules):
+    def sort_remaining_foldsets_by_size(self, current_cpds, current_rns, current_folds):#, remaining_rules):
 
-        remaining_rules = scope_rules.remaining_rules(current_folds)
+        remaining_rules = self.scope_rules.remaining_rules(current_folds)
         remaining_foldsets = set([i-current_folds for i in remaining_rules.foldsets])
-        # remaining_foldsets_by_size = 
+        rule_sizes = sorted(set([len(i) for i in remaining_foldsets]))
+        ## Organizes rules by size
+        size2foldsets = {size:list() for size in rule_sizes}
+        for fs in sorted(remaining_foldsets): ## sorted for reproduceability
+            size2foldsets[len(fs)].append(fs)
 
-        
+        return size2foldsets
 
-        future_rule2rns = {k:(v | current_rns) for k,v in remaining_rules.items() if len(v-current_rns)>0}
+    def loop_through_remaining_foldsets(self, size2foldsets):
 
+        max_r_effects = dict()
+        for size, foldsets in size2foldsets.items():
+
+            for foldset in foldsets:
+
+                _fdict = dict()
+                _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold2(rule, current_folds, current_cpds)
+
+                n_rules_checked+=1
+                n_new_rns = len(_fdict["rns"] - current_rns)
+                print("n_rules_checked: ", n_rules_checked)
+                if n_new_rns > 0:
+                    print("rule enabling new reactions found! ", rule)                    
+                
+                if n_new_rns == max_v:
+                    max_r_effects[rule] = _fdict
+                elif n_new_rns > max_v:
+                    max_v = n_new_rns
+                    for rule in max_r_effects:
+                        rn_sets_enabling_less_than_max.add(frozenset(max_r_effects[rule]["rns"]))
+                    max_r_effects = dict()
+                    max_r_effects[rule] = _fdict
+                else: # n_new_rns < max_v
+                    rn_sets_enabling_less_than_max.add(frozenset(_fdict["rns"]))
+
+            ## Don't look for longer rules if shorter rules enable new reactions
+            if len(max_r_effects)>0:
+                break
 
     # def get_remaining_rules(self, scope_rules, current_rules):
 
