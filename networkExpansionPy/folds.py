@@ -92,10 +92,17 @@ class Rule:
 class FoldRules:
 
     def __init__(self,rules:list):
-        self.rules = rules
-        self.rn2rule = self.rn2rule()
-        self.fs2rule = self.fs2rule()
-        self.folds = self.folds()
+        self._rules = rules
+        self._rns = None
+        self._folds = None 
+        self._foldsets = None
+        # self.rn2rule = self.rn2rule()
+        # self.fs2rule = self.fs2rule()
+        # self.rns = self.rns()
+        # print([r for r in self.rules])
+        # self.rns = set([r.rn for r in self.rules])
+        # self.folds = self.folds()
+        # self.foldsets = self.foldsets()
 
     def __repr__(self):
         return "[\n"+",\n".join([str(i) for i in self.rules])+"]"
@@ -109,28 +116,44 @@ class FoldRules:
 
         return cls(rules)
 
+    @property
+    def rules(self):
+        return self._rules
+
+    @property
     def rns(self):
-        return set([r.rn for r in self.rules])
+        if self._rns == None:
+            self._rns = set([r.rn for r in self.rules])
+        return self._rns
 
+    @property
     def folds(self):
-        return set([f for r in self.rules for f in r.foldset])
+        if self._folds == None:
+            self._folds = set([f for r in self.rules for f in r.foldset])
+        return self._folds
 
+    @property 
     def foldsets(self):
-        return set()
+        if self._foldsets == None:
+            self._foldsets = set([r.foldset for r in self.rules])
+        return self._foldsets
 
     def subset_from_rns(self, rns):
-        # return Rules([r for r in self.rules if r.rn in rns])
-        return Rules([self.rn2rule[r] for r in rns])
+        return FoldRules([r for r in self.rules if r.rn in rns])
+        # return FoldRules([self.rn2rule[r] for r in rns])
 
     def subset_from_folds(self, folds):
-        return Rules([r for r in self.rules if r.foldset<=folds])
+        return FoldRules([r for r in self.rules if r.foldset<=folds])
         # return Rules([self.fs2rule[r] for r in rns])
 
-    def rn2rule(self):
-        return {r.rn:r for r in self.rules}
+    def remaining_rules(self, current_folds):
+        return FoldRules([r for r in self.rules if len(r.foldset-current_folds)>0])
 
-    def fs2rule(self):
-        return {r.foldset:r for r in self.rules}
+    # def rn2rule(self):
+    #     return {r.rn:r for r in self.rules}
+
+    # def fs2rule(self):
+    #     return {r.foldset:r for r in self.rules}
 
 class FoldMetabolism:
     ## Rename to something like FoldScope?
@@ -150,10 +173,11 @@ class FoldMetabolism:
         self._m = metabolism ## GlobalMetabolicNetwork object
         self._f = foldrules # FoldRules object
 
-        self.fold_independent_rns = None
+        self.fold_independent_rns = fold_independent_rns
         self.seed_folds = None
         self._seed_cpds = None
 
+        self.scope_rules = None
         self.scope_cpds = None
         self.scope_rns = None
         self.scope_folds = None
@@ -190,10 +214,10 @@ class FoldMetabolism:
         if (self._seed_cpds == None) or (self._seed_cpds != seed_cpds):
             self._seed_cpds = seed_cpds 
             self.scope_cpds, self.scope_rns = self.calculate_scope(self._seed_cpds)
-            self.scope_rules = self.f.rules.subset_from_rns(self.scope_rns)
+            self.scope_rules = self.f.subset_from_rns(self.scope_rns)
             # self.scope_rn2rules = {k:v for k,v in self.f.rn2rules.items() if k in self.scope_rns}
             # self.scope_rules2rn = rule2rn(self.scope_rn2rules)
-            self.scope_folds = set([i for fs in self.scope_rules2rn.keys() for i in fs])
+            self.scope_folds = self.scope_rules.folds #set([i for fs in self.scope_rules2rn.keys() for i in fs])
 
         else:
             pass 
@@ -205,7 +229,7 @@ class FoldMetabolism:
         :param seed_cpds: collection of compound ids
         :return: set of compounds and set of reactions in the scope
         """
-        rn_tup_set = set(self.m.rxns2tuple((self.f.rns | self.f.fold_independent_rns)))
+        rn_tup_set = set(self.m.rxns2tuple((self.f.rns | self.fold_independent_rns)))
         scope_cpds, scope_rns = self.m.expand(seed_cpds, reaction_mask=rn_tup_set)
         return set(scope_cpds), set([i[0] for i in scope_rns])
 
@@ -257,9 +281,21 @@ class FoldMetabolism:
         return cx, rx
 
 
-    def loop_through_rules2(self):
+    def loop_through_rules2(self, current_cpds, current_rns, current_folds, remaining_rules):
 
-        potential_ruleset = self.effect_per_rule_or_fold
+        remaining_rules = scope_rules.remaining_rules(current_folds)
+        remaining_foldsets = set([i-current_folds for i in remaining_rules.foldsets])
+        # remaining_foldsets_by_size = 
+
+        
+
+        future_rule2rns = {k:(v | current_rns) for k,v in remaining_rules.items() if len(v-current_rns)>0}
+
+
+    # def get_remaining_rules(self, scope_rules, current_rules):
+
+    #     return scope_rules.remaining_rules(current_folds)
+        
 
     ######
 
