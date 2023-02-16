@@ -80,10 +80,40 @@ class Current:
 
     ## I should use this kind of object to store informaiton about the: remaining, scope, and maybe seeds?
 
-    def __init__(self, starting_folds, starting_cpds, starting_rns):
-        self.folds = deepcopy(starting_folds)
-        self.cpds = deepcopy(starting_cpds)
-        self.rns = deepcopy(starting_rns)
+    def __init__(self, folds=None, cpds=None, rns=None, rules=None):
+        self.folds = folds
+        self.cpds = cpds
+        self.rns = rns
+        self.rules = rules
+
+    @property
+    def folds(self):
+        return self._folds
+    @folds.setter
+    def folds(self, value):
+        self._folds = deepcopy(value)
+
+    @property
+    def cpds(self):
+        return self._cpds
+    @cpds.setter
+    def cpds(self, value):
+        self._cpds = deepcopy(value)
+
+    @property
+    def rns(self):
+        return self._rns
+    @rns.setter
+    def rns(self, value):
+        self._rns = deepcopy(value)
+
+    @property
+    def rules(self):
+        return self._rules
+    @rules.setter
+    def rules(self, value):
+        self._rules = deepcopy(value)
+
 
 class Result:
 
@@ -94,15 +124,20 @@ class Result:
         self.rns = dict()
         self.folds = {"fold_independent":0}
         self.start_time = timeit.default_timer()
+        self.iteration_time = dict()
 
     def first_update(self, current):
         self.update_cpds(current)
         self.update_rns(current)
+        self.update_iter()
+        self.update_iteration_time()
 
     def update(self, current):
         self.update_cpds(current)
         self.update_rns(current)
         self.update_folds(current)
+        self.update_iter()
+        self.update_iteration_time()
 
     def update_cpds(self, current):
         for i in current.cpds:
@@ -118,6 +153,9 @@ class Result:
         for i in current.folds:
             if i not in self.folds:
                 self.folds[i] = self.iteration
+
+    def update_iteration_time(self):
+        self.iteration_time[self.iteration] =  timeit.default_timer() - self.start_time
 
     def update_iter(self):
         self.iteration+=1
@@ -338,7 +376,7 @@ class FoldMetabolism:
         return cx, rx
 
 
-    def sort_remaining_foldsets_by_size(self, current_cpds, current_rns, current_folds):#, remaining_rules):
+    def sort_remaining_foldsets_by_size(self, current_folds):#, remaining_rules):
 
         remaining_rules = self.scope_rules.remaining_rules(current_folds)
         remaining_foldsets = set([i-current_folds for i in remaining_rules.foldsets]) ## excludes folds already discovered
@@ -359,22 +397,19 @@ class FoldMetabolism:
 
             for foldset in foldsets:
 
-                _fdict = dict()
-                _fdict["cpds"], _fdict["rns"] = self.effect_per_foldset(foldset, current_folds, current_cpds)
-                _fdict["rules"] = self.f.subset_from_rns(_fdict["rns"])
+                effects = Current()
 
-                # n_new_cpds = len(_fdict["cpds"] - current["cpds"])
-                # n_new_rns = len(_fdict["rns"] - current["rns"])
-                # n_new_rules = len(_fdict["rules"] - current["rules"])  # current["rules"] should equal self.f.subset_from_rns(current_rns)
+                effects.cpds, effects.rns = self.effect_per_foldset(foldset, current_folds, current_cpds)
+                effects.rules = self.f.subset_from_rns(effects.rns)
 
-                n_new = len(_fdict[key_to_maximize] - current[key_to_maximize])
+                n_new = len(getattr(effects, key_to_maximize) - getattr(current,key_to_maximize))
 
                 if n_new == max_v:
-                    max_effects[foldset] = _fdict
+                    max_effects[foldset] = effects
                 elif n_new > max_v:
                     max_v = n_new
                     max_effects = dict()
-                    max_effects[foldset] = _fdict
+                    max_effects[foldset] = effects
                 else: # n_new < max_v
                     pass
 
@@ -384,88 +419,64 @@ class FoldMetabolism:
 
         return max_effects
 
-    def select_next_foldset():
+    def select_next_foldset(algorithm, size2foldsets, current):
         
         if algorithm == "max_rules":
             max_effects = self.loop_through_rules(size2foldsets, current, "rules")
             if len(max_effects) == 0:
                 next_foldset = frozenset()
-                max_effects[next_foldset] = {"cpds":deepcopy(current_cpds), "rns":deepcopy(current_rns)}
+                max_effects[next_foldset] = deepcopy(current)
                 print("NO max_effects REMAINING")
             else:
                 next_foldset = random.choice(sorted(max_effects.keys()))
             return next_foldset, max_effects[next_foldset]
 
-    def rule_order(self, algorithm="maxreactionsupersets"):
+    def keepgoing(self, current):
+
+        ## It should always stop if we've found all scope cpds, rns
+        ## actually it might be possible to discover all reactions and compounds but not all rules
+        ## but if we've discovered all folds then we've discovered all rules
+        if (current.cpds == self.scope_cpds) and (current.rns == self.scope_rns) and (current.folds == self.scope_folds):
+            return False
+
+        else:
+            return True
+
+    def rule_order(self, algorithm="max_rules", ):
 
         ## Place to store results and current state of expansion
         result = Result()
         current = Current(self.seed_folds, self.seed_cpds, set([]))
         
-        ## ITERATION 0 
-        ## (Avoid updating folds on the 0th iteration since they don't apply until iteration=1)
+        ## ITERATION 0 (Avoid updating folds on the 0th iteration since they don't apply until iteration=1)
         result.first_update(current)
-        result.update_iter()
 
-        ## ITERATION 1 
-        ## (using only seed folds and fold independent reactions)
+        ## ITERATION 1 (using only seed folds and fold independent reactions)
         current.cpds, current.rns = self.fold_expand3(current.folds, current.cpds)
-        remaining_folds = (self.scope_folds - current["folds"]) 
-        remaining_rules = {k:v for k,v in self.scope_rules2rn.items() if len(k & remaining_folds)>0}
         result.update(current)
-        ## Update metadata
-        metadict["runtime"][iteration] = timeit.default_timer() - start
 
         ## Needed in case expansion not possible at all
-        if len(remaining_folds) > 0:
-            keepgoing = True
-        else:
-            keepgoing = False
+        keep_going = self.keep_going(current)
 
         ################################################
         ## ITERATION 2+
         while keepgoing:
-            start = timeit.default_timer()
-            iteration += 1
-            print("rule_order iteration: ", iteration)
-            for k,v in metadict.items():
-                print(k, v)
-            next_rule, fdata, n_rules_checked, n_rules_skipped = self.select_next_rule_or_fold(current["folds"], current["cpds"], current["rns"], remaining_folds, remaining_rules, algorithm)
-            remaining_folds = (remaining_folds - set(next_rule))
-            remaining_rules = {k:v for k,v in self.scope_rules2rn.items() if len(k & remaining_folds)>0}
-            # remaining_rules = {k:v for k,v in self.scope_rules2rn.items() if k not in subset_rule2rn_from_folds(current["folds"], self.scope_rules2rn)}
+            print("rule_order iteration; time: ", result.iteration, result.iteration_time)
+            size2foldsets = sort_remaining_foldsets_by_size(current.folds)
+            next_foldset, effects = self.select_next_foldset(algorithm, size2foldsets, current)
 
-            ## Stop conditions
-            if len(remaining_folds) == 0:
-                keepgoing = False
-            if len(next_rule) == 0:
-                keepgoing == False
-            if (fdata["cpds"] == current["cpds"]) and (fdata["rns"] == current["rns"]):
-                keepgoing = False    
-            else:
+            keep_going = self.keep_going(current)
+
+            if keep_going:
                 ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
-                current["folds"] = (current["folds"] | set(next_rule))
-                current["cpds"] = fdata["cpds"]
-                current["rns"] = fdata["rns"]
+                current.folds = (current.folds | set(next_foldset))
+                current.cpds = effects.cpds
+                current.rns = effects.rns
                 
-                ## Store when cpds and rns appear in the expansion
-                iteration_dict = update_iteration_dict(iteration_dict, current, iteration)
+            ## Store when cpds and rns appear in the expansion
+            result.update(current)
 
-            ## Update metadata
-            metadict["runtime"][iteration] = timeit.default_timer() - start
-            # metadict["freefolds"][iteration] = free_folds
-            metadict["n_rules_skipped"][iteration] = n_rules_skipped
-            metadict["n_rules_checked"][iteration] = n_rules_checked
-            metadict["max_n_remaining_folds"][iteration] = len(remaining_folds)
-            metadict["max_n_remaining_rules"][iteration] = len(self.scope_rules2rn) - len(subset_rule2rn_from_folds(current["folds"], self.scope_rules2rn))
-
-        return current, iteration_dict, metadict
-
-
-    # def get_remaining_rules(self, scope_rules, current_rules):
-
-    #     return scope_rules.remaining_rules(current_folds)
-        
+        return result
 
     ######
 
