@@ -263,10 +263,10 @@ class FoldMetabolism:
 
 
         self.scope = Current()
-        # self.scope_rules = None
-        # self.scope_cpds = None
-        # self.scope_rns = None
-        # self.scope_folds = None
+        # self.scope.rules = None
+        # self.scope.cpds = None
+        # self.scope.rns = None
+        # self.scope.folds = None
 
         # self.scope_rules2rn = None
         # self.scope_rn2rules = None
@@ -300,11 +300,9 @@ class FoldMetabolism:
         """
         if (self._seed_cpds == None) or (self._seed_cpds != seed_cpds):
             self._seed_cpds = seed_cpds 
-            self.scope_cpds, self.scope_rns = self.calculate_scope(self._seed_cpds)
-            self.scope_rules = self.f.subset_from_rns(self.scope_rns)
-            # self.scope_rn2rules = {k:v for k,v in self.f.rn2rules.items() if k in self.scope_rns}
-            # self.scope_rules2rn = rule2rn(self.scope_rn2rules)
-            self.scope_folds = self.scope_rules.folds #set([i for fs in self.scope_rules2rn.keys() for i in fs])
+            self.scope.cpds, self.scope.rns = self.calculate_scope(self._seed_cpds)
+            self.scope.rules = self.f.subset_from_rns(self.scope.rns)
+            self.scope.folds = self.scope.rules.folds 
 
         else:
             pass 
@@ -317,8 +315,8 @@ class FoldMetabolism:
         :return: set of compounds and set of reactions in the scope
         """
         rn_tup_set = set(self.m.rxns2tuple((self.f.rns | self.fold_independent_rns)))
-        scope_cpds, scope_rns = self.m.expand(seed_cpds, reaction_mask=rn_tup_set)
-        return set(scope_cpds), set([i[0] for i in scope_rns])
+        scope.cpds, scope.rns = self.m.expand(seed_cpds, reaction_mask=rn_tup_set)
+        return set(scope.cpds), set([i[0] for i in scope.rns])
 
     # def fold_expand(self, rule2rns, cpds):
     #     """
@@ -378,7 +376,7 @@ class FoldMetabolism:
 
     def sort_remaining_foldsets_by_size(self, current_folds):#, remaining_rules):
 
-        remaining_rules = self.scope_rules.remaining_rules(current_folds)
+        remaining_rules = self.scope.rules.remaining_rules(current_folds)
         remaining_foldsets = set([i-current_folds for i in remaining_rules.foldsets]) ## excludes folds already discovered
         rule_sizes = sorted(set([len(i) for i in remaining_foldsets]))
         ## Organizes rules by size
@@ -399,7 +397,7 @@ class FoldMetabolism:
 
                 effects = Current()
 
-                effects.cpds, effects.rns = self.effect_per_foldset(foldset, current_folds, current_cpds)
+                effects.cpds, effects.rns = self.effect_per_foldset(foldset, current.folds, current.cpds)
                 effects.rules = self.f.subset_from_rns(effects.rns)
 
                 n_new = len(getattr(effects, key_to_maximize) - getattr(current,key_to_maximize))
@@ -422,7 +420,7 @@ class FoldMetabolism:
     def select_next_foldset(algorithm, size2foldsets, current):
         
         if algorithm == "max_rules":
-            max_effects = self.loop_through_rules(size2foldsets, current, "rules")
+            max_effects = self.loop_through_remaining_foldsets(size2foldsets, current, "rules")
             if len(max_effects) == 0:
                 next_foldset = frozenset()
                 max_effects[next_foldset] = deepcopy(current)
@@ -436,7 +434,7 @@ class FoldMetabolism:
         ## It should always stop if we've found all scope cpds, rns
         ## actually it might be possible to discover all reactions and compounds but not all rules
         ## but if we've discovered all folds then we've discovered all rules
-        if (current.cpds == self.scope_cpds) and (current.rns == self.scope_rns) and (current.folds == self.scope_folds):
+        if (current.cpds == self.scope.cpds) and (current.rns == self.scope.rns) and (current.folds == self.scope.folds):
             return False
 
         else:
@@ -446,7 +444,7 @@ class FoldMetabolism:
 
         ## Place to store results and current state of expansion
         result = Result()
-        current = Current(self.seed_folds, self.seed_cpds, set([]))
+        current = Current(self.seed_folds, self.seed_cpds, set([]), self.scope.rules.subset_from_folds(self.seed_folds))
         
         ## ITERATION 0 (Avoid updating folds on the 0th iteration since they don't apply until iteration=1)
         result.first_update(current)
@@ -470,6 +468,7 @@ class FoldMetabolism:
             if keep_going:
                 ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
                 current.folds = (current.folds | set(next_foldset))
+                current.rules = current.rules.subset_from_folds(current.folds)
                 current.cpds = effects.cpds
                 current.rns = effects.rns
                 
