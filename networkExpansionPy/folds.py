@@ -76,6 +76,55 @@ def update_iteration_dict(iteration_dict, current, iteration):
 #         self.rns = set(rn2rules.keys()) ## reactions in fold network only
 #         self.folds = set([i for fs in self.rule2rns.keys() for i in fs]) ## all folds
 #         self.fold_independent_rns = fold_independent_rns
+class Current:
+
+    ## I should use this kind of object to store informaiton about the: remaining, scope, and maybe seeds?
+
+    def __init__(self, starting_folds, starting_cpds, starting_rns):
+        self.folds = deepcopy(starting_folds)
+        self.cpds = deepcopy(starting_cpds)
+        self.rns = deepcopy(starting_rns)
+
+class Result:
+
+    def __init__(self):
+        self.iteration = 0
+        self.runtime = dict()  
+        self.cpds = dict()
+        self.rns = dict()
+        self.folds = {"fold_independent":0}
+        self.start_time = timeit.default_timer()
+
+    def first_update(self, current):
+        self.update_cpds(current)
+        self.update_rns(current)
+
+    def update(self, current):
+        self.update_cpds(current)
+        self.update_rns(current)
+        self.update_folds(current)
+
+    def update_cpds(self, current):
+        for i in current.cpds:
+            if i not in self.cpds:
+                self.cpds[i] = self.iteration
+
+    def update_rns(self, current):
+        for i in current.rns:
+            if i not in self.rns:
+                self.rns[i] = self.iteration
+
+    def update_folds(self, current):
+        for i in current.folds:
+            if i not in self.folds:
+                self.folds[i] = self.iteration
+
+    def update_iter(self):
+        self.iteration+=1
+
+        # iteration_dict = update_iteration_dict(iteration_dict, {k:v for k,v in current.items() if k!="folds"}, iteration)
+        # iteration+=1
+
 
 class Rule:
 
@@ -266,25 +315,33 @@ class FoldMetabolism:
 
     ######
 
-    def fold_expand2(self, fold_rns, current_cpds):
+    def fold_expand3(self, folds, current_cpds):
 
-        rn_tup_set = set(self.m.rxns2tuple(fold_rns | self.fold_independent_rns))
+        active_rules = self.f.subset_from_folds(folds)
+        rn_tup_set = set(self.m.rxns2tuple(active_rules.rns | self.fold_independent_rns))
         cx,rx = self.m.expand(current_cpds, reaction_mask=rn_tup_set)
         return set(cx), set([i[0] for i in rx])
 
+    # def fold_expand2(self, fold_rns, current_cpds):
 
-    def effect_per_rule_or_fold2(self, rule, current_folds, current_cpds):
+    #     rn_tup_set = set(self.m.rxns2tuple(fold_rns | self.fold_independent_rns))
+    #     cx,rx = self.m.expand(current_cpds, reaction_mask=rn_tup_set)
+    #     return set(cx), set([i[0] for i in rx])
 
-        potential_fold_set = (current_folds | set(rule))
-        potential_rules = self.f.subset_from_folds(potential_fold_set)
-        cx,rx = self.fold_expand2(potential_rules.rns, current_cpds)
+
+    def effect_per_foldset(self, foldset, current_folds, current_cpds):
+
+        potential_fold_set = (current_folds | set(foldset))
+        # potential_rules = self.f.subset_from_folds(potential_fold_set)
+        # cx,rx = self.fold_expand2(potential_rules.rns, current_cpds)
+        cx,rx = self.fold_expand3(potential_fold_set, current_cpds)
         return cx, rx
 
 
     def sort_remaining_foldsets_by_size(self, current_cpds, current_rns, current_folds):#, remaining_rules):
 
         remaining_rules = self.scope_rules.remaining_rules(current_folds)
-        remaining_foldsets = set([i-current_folds for i in remaining_rules.foldsets])
+        remaining_foldsets = set([i-current_folds for i in remaining_rules.foldsets]) ## excludes folds already discovered
         rule_sizes = sorted(set([len(i) for i in remaining_foldsets]))
         ## Organizes rules by size
         size2foldsets = {size:list() for size in rule_sizes}
@@ -293,36 +350,117 @@ class FoldMetabolism:
 
         return size2foldsets
 
-    def loop_through_remaining_foldsets(self, size2foldsets):
+    def loop_through_remaining_foldsets(self, size2foldsets, current, key_to_maximize):
+        ## key_to_maximize is one of "rns", "cpds", "rule"
 
-        max_r_effects = dict()
+        max_effects = dict()
+        max_v = 0
         for size, foldsets in size2foldsets.items():
 
             for foldset in foldsets:
 
                 _fdict = dict()
-                _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold2(rule, current_folds, current_cpds)
+                _fdict["cpds"], _fdict["rns"] = self.effect_per_foldset(foldset, current_folds, current_cpds)
+                _fdict["rules"] = self.f.subset_from_rns(_fdict["rns"])
 
-                n_rules_checked+=1
-                n_new_rns = len(_fdict["rns"] - current_rns)
-                print("n_rules_checked: ", n_rules_checked)
-                if n_new_rns > 0:
-                    print("rule enabling new reactions found! ", rule)                    
-                
-                if n_new_rns == max_v:
-                    max_r_effects[rule] = _fdict
-                elif n_new_rns > max_v:
-                    max_v = n_new_rns
-                    for rule in max_r_effects:
-                        rn_sets_enabling_less_than_max.add(frozenset(max_r_effects[rule]["rns"]))
-                    max_r_effects = dict()
-                    max_r_effects[rule] = _fdict
-                else: # n_new_rns < max_v
-                    rn_sets_enabling_less_than_max.add(frozenset(_fdict["rns"]))
+                # n_new_cpds = len(_fdict["cpds"] - current["cpds"])
+                # n_new_rns = len(_fdict["rns"] - current["rns"])
+                # n_new_rules = len(_fdict["rules"] - current["rules"])  # current["rules"] should equal self.f.subset_from_rns(current_rns)
+
+                n_new = len(_fdict[key_to_maximize] - current[key_to_maximize])
+
+                if n_new == max_v:
+                    max_effects[foldset] = _fdict
+                elif n_new > max_v:
+                    max_v = n_new
+                    max_effects = dict()
+                    max_effects[foldset] = _fdict
+                else: # n_new < max_v
+                    pass
 
             ## Don't look for longer rules if shorter rules enable new reactions
-            if len(max_r_effects)>0:
+            if len(max_effects)>0:
                 break
+
+        return max_effects
+
+    def select_next_foldset():
+        
+        if algorithm == "max_rules":
+            max_effects = self.loop_through_rules(size2foldsets, current, "rules")
+            if len(max_effects) == 0:
+                next_foldset = frozenset()
+                max_effects[next_foldset] = {"cpds":deepcopy(current_cpds), "rns":deepcopy(current_rns)}
+                print("NO max_effects REMAINING")
+            else:
+                next_foldset = random.choice(sorted(max_effects.keys()))
+            return next_foldset, max_effects[next_foldset]
+
+    def rule_order(self, algorithm="maxreactionsupersets"):
+
+        ## Place to store results and current state of expansion
+        result = Result()
+        current = Current(self.seed_folds, self.seed_cpds, set([]))
+        
+        ## ITERATION 0 
+        ## (Avoid updating folds on the 0th iteration since they don't apply until iteration=1)
+        result.first_update(current)
+        result.update_iter()
+
+        ## ITERATION 1 
+        ## (using only seed folds and fold independent reactions)
+        current.cpds, current.rns = self.fold_expand3(current.folds, current.cpds)
+        remaining_folds = (self.scope_folds - current["folds"]) 
+        remaining_rules = {k:v for k,v in self.scope_rules2rn.items() if len(k & remaining_folds)>0}
+        result.update(current)
+        ## Update metadata
+        metadict["runtime"][iteration] = timeit.default_timer() - start
+
+        ## Needed in case expansion not possible at all
+        if len(remaining_folds) > 0:
+            keepgoing = True
+        else:
+            keepgoing = False
+
+        ################################################
+        ## ITERATION 2+
+        while keepgoing:
+            start = timeit.default_timer()
+            iteration += 1
+            print("rule_order iteration: ", iteration)
+            for k,v in metadict.items():
+                print(k, v)
+            next_rule, fdata, n_rules_checked, n_rules_skipped = self.select_next_rule_or_fold(current["folds"], current["cpds"], current["rns"], remaining_folds, remaining_rules, algorithm)
+            remaining_folds = (remaining_folds - set(next_rule))
+            remaining_rules = {k:v for k,v in self.scope_rules2rn.items() if len(k & remaining_folds)>0}
+            # remaining_rules = {k:v for k,v in self.scope_rules2rn.items() if k not in subset_rule2rn_from_folds(current["folds"], self.scope_rules2rn)}
+
+            ## Stop conditions
+            if len(remaining_folds) == 0:
+                keepgoing = False
+            if len(next_rule) == 0:
+                keepgoing == False
+            if (fdata["cpds"] == current["cpds"]) and (fdata["rns"] == current["rns"]):
+                keepgoing = False    
+            else:
+                ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
+                current["folds"] = (current["folds"] | set(next_rule))
+                current["cpds"] = fdata["cpds"]
+                current["rns"] = fdata["rns"]
+                
+                ## Store when cpds and rns appear in the expansion
+                iteration_dict = update_iteration_dict(iteration_dict, current, iteration)
+
+            ## Update metadata
+            metadict["runtime"][iteration] = timeit.default_timer() - start
+            # metadict["freefolds"][iteration] = free_folds
+            metadict["n_rules_skipped"][iteration] = n_rules_skipped
+            metadict["n_rules_checked"][iteration] = n_rules_checked
+            metadict["max_n_remaining_folds"][iteration] = len(remaining_folds)
+            metadict["max_n_remaining_rules"][iteration] = len(self.scope_rules2rn) - len(subset_rule2rn_from_folds(current["folds"], self.scope_rules2rn))
+
+        return current, iteration_dict, metadict
+
 
     # def get_remaining_rules(self, scope_rules, current_rules):
 
@@ -478,13 +616,6 @@ class FoldMetabolism:
 
         # elif algorithm == "maxreactions":
         #     r_effects, n_rules_checked, n_equal_rule_groups = self.loop_through_rules(current_folds, current_cpds, current_rns)
-
-    class Metadata:
-
-        def __init__(self):
-            self.runtime = dict()
-            self.n
-    
 
     
     def rule_order(self, algorithm="maxreactionsupersets"):
