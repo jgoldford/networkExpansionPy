@@ -569,78 +569,90 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                         'F8': 10,
                         'F9': 11}
 
+        expected_rules = {("R0", frozenset({'F0'})):2,
+                        ("R1", frozenset({'F1'})):3,
+                        ("R2", frozenset({'F2'})):4,
+                        ("R3", frozenset({'F3'})):5,
+                        ("R4", frozenset({'F4'})):6,
+                        ("R5", frozenset({'F5'})):7,
+                        ("R6", frozenset({'F6'})):8,
+                        ("R7", frozenset({'F7'})):9,
+                        ("R8", frozenset({'F8'})):10,
+                        ("R9", frozenset({'F9'})):11}
+
         self.assertEqual(expected_cpds, result.cpds)
         self.assertEqual(expected_rns, result.rns)
         self.assertEqual(expected_folds, result.folds)
+        self.assertEqual(expected_rules, result.rules)
         
-#     def test_FoldMetabolism_rule_order_C0_independent_R0R1(self):
-#         fold_independent_rns = set(["R0","R1"])
-#         foldrules = nf.FoldRules(self.rn2rules, fold_independent_rns)
-#         fm = nf.FoldMetabolism(self.met, foldrules)
-#         fm.seed_cpds = set(['C0'])
-#         fm.seed_folds = set([])
+    # def test_FoldMetabolism_rule_order_C0_independent_R0R1(self):
+    #     fold_independent_rns = set(["R0","R1"])
+    #     foldrules = nf.FoldRules(self.rn2rules, fold_independent_rns)
+    #     fm = nf.FoldMetabolism(self.met, foldrules)
+    #     fm.seed_cpds = set(['C0'])
+    #     fm.seed_folds = set([])
 
-#         expected_scope_rules2rn = {frozenset({'F0'}): {'R0'},
-#                                 frozenset({'F1'}): {'R1'},
-#                                 frozenset({'F2'}): {'R2'},
-#                                 frozenset({'F3'}): {'R3'},
-#                                 frozenset({'F4'}): {'R4'},
-#                                 frozenset({'F5'}): {'R5'},
-#                                 frozenset({'F6'}): {'R6'},
-#                                 frozenset({'F7'}): {'R7'},
-#                                 frozenset({'F8'}): {'R8'},
-#                                 frozenset({'F9'}): {'R9'}}
-#         self.assertEqual(fm.scope_rules2rn, expected_scope_rules2rn)
+    #     expected_scope_rules2rn = {frozenset({'F0'}): {'R0'},
+    #                             frozenset({'F1'}): {'R1'},
+    #                             frozenset({'F2'}): {'R2'},
+    #                             frozenset({'F3'}): {'R3'},
+    #                             frozenset({'F4'}): {'R4'},
+    #                             frozenset({'F5'}): {'R5'},
+    #                             frozenset({'F6'}): {'R6'},
+    #                             frozenset({'F7'}): {'R7'},
+    #                             frozenset({'F8'}): {'R8'},
+    #                             frozenset({'F9'}): {'R9'}}
+    #     self.assertEqual(fm.scope_rules2rn, expected_scope_rules2rn)
 
-#         expected_scope_rn2rules = {'R0': {frozenset({'F0'})},
-#                                 'R1': {frozenset({'F1'})},
-#                                 'R2': {frozenset({'F2'})},
-#                                 'R3': {frozenset({'F3'})},
-#                                 'R4': {frozenset({'F4'})},
-#                                 'R5': {frozenset({'F5'})},
-#                                 'R6': {frozenset({'F6'})},
-#                                 'R7': {frozenset({'F7'})},
-#                                 'R8': {frozenset({'F8'})},
-#                                 'R9': {frozenset({'F9'})}}
-#         self.assertEqual(fm.scope_rn2rules, expected_scope_rn2rules)
+    #     expected_scope_rn2rules = {'R0': {frozenset({'F0'})},
+    #                             'R1': {frozenset({'F1'})},
+    #                             'R2': {frozenset({'F2'})},
+    #                             'R3': {frozenset({'F3'})},
+    #                             'R4': {frozenset({'F4'})},
+    #                             'R5': {frozenset({'F5'})},
+    #                             'R6': {frozenset({'F6'})},
+    #                             'R7': {frozenset({'F7'})},
+    #                             'R8': {frozenset({'F8'})},
+    #                             'R9': {frozenset({'F9'})}}
+    #     self.assertEqual(fm.scope_rn2rules, expected_scope_rn2rules)
 
-#         current, iteration_dict, metadict = fm.rule_order()
-#         expected_current = {'folds': {'F0', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'},
-#                             'cpds': {'C0', 'C1', 'C10', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9'},
-#                             'rns': {'R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9'}}
+    #     current, iteration_dict, metadict = fm.rule_order()
+    #     expected_current = {'folds': {'F0', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'},
+    #                         'cpds': {'C0', 'C1', 'C10', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9'},
+    #                         'rns': {'R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9'}}
 
-#         expected_iteration_dict = {'cpds': {'C0': 0,
-#                                 'C1': 1,
-#                                 'C2': 1,
-#                                 'C3': 2,
-#                                 'C4': 3,
-#                                 'C5': 4,
-#                                 'C6': 5,
-#                                 'C7': 6,
-#                                 'C8': 7,
-#                                 'C9': 8,
-#                                 'C10': 9},
-#                                 'rns': {'R0': 1,
-#                                 'R1': 1,
-#                                 'R2': 2,
-#                                 'R3': 3,
-#                                 'R4': 4,
-#                                 'R5': 5,
-#                                 'R6': 6,
-#                                 'R7': 7,
-#                                 'R8': 8,
-#                                 'R9': 9},
-#                                 'folds': {'fold_independent': 0,
-#                                 'F0': 2,
-#                                 'F1': 3,
-#                                 'F2': 4,
-#                                 'F3': 5,
-#                                 'F4': 6,
-#                                 'F5': 7,
-#                                 'F6': 8,
-#                                 'F7': 9,
-#                                 'F8': 10,
-#                                 'F9': 11}}
+    #     expected_iteration_dict = {'cpds': {'C0': 0,
+    #                             'C1': 1,
+    #                             'C2': 1,
+    #                             'C3': 2,
+    #                             'C4': 3,
+    #                             'C5': 4,
+    #                             'C6': 5,
+    #                             'C7': 6,
+    #                             'C8': 7,
+    #                             'C9': 8,
+    #                             'C10': 9},
+    #                             'rns': {'R0': 1,
+    #                             'R1': 1,
+    #                             'R2': 2,
+    #                             'R3': 3,
+    #                             'R4': 4,
+    #                             'R5': 5,
+    #                             'R6': 6,
+    #                             'R7': 7,
+    #                             'R8': 8,
+    #                             'R9': 9},
+    #                             'folds': {'fold_independent': 0,
+    #                             'F0': 2,
+    #                             'F1': 3,
+    #                             'F2': 4,
+    #                             'F3': 5,
+    #                             'F4': 6,
+    #                             'F5': 7,
+    #                             'F6': 8,
+    #                             'F7': 9,
+    #                             'F8': 10,
+    #                             'F9': 11}}
 
 #     def test_FoldMetabolism_rule_order_C0_independent_R3R5(self):
 #         fold_independent_rns = set(["R3","R5"])

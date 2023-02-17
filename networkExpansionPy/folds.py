@@ -403,10 +403,10 @@ class FoldMetabolism:
             if keep_going:
                 ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
                 current.folds = (current.folds | set(next_foldset))
-                current.rules = current.rules.subset_from_folds(current.folds)
+                current.rules = self.scope.rules.subset_from_folds(current.folds)
                 current.cpds = effects.cpds
                 current.rns = effects.rns
-                
+
             ## Store when cpds and rns appear in the expansion
             result.update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
