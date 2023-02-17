@@ -2,13 +2,12 @@ import unittest
 import networkExpansionPy.lib as ne
 import networkExpansionPy.folds as nf
 import pandas as pd
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, SparseEfficiencyWarning
 from pprint import pprint
 import random
 
 import warnings
-from scipy.sparse import SparseEfficiencyWarning
-warnings.filterwarnings('ignore', SparseEfficiencyWarning)
+# warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
 
 random.seed(3141)
 # from pandas.testing import assert_frame_equal
@@ -481,6 +480,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
     maxDiff = None ## allows full output of failed test differences
 
     def setUp(self):
+        warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
         reactions = 10
         compounds = 11
         rids = ['R' + str(x) for x in range(reactions)]
@@ -516,6 +516,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         # print(self.met.network)
 
     def test_GlobalFoldNetwork_create_foldrules2rn(self):
+        warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
         foldrules = nf.FoldRules.from_rn2rules(self.rn2rules)
         expected_ruleids = set([
             ("R0", frozenset({'F0'})),
@@ -533,6 +534,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         self.assertEqual(set(foldrules.ids), expected_ruleids)
 
     def test_FoldMetabolism_rule_order_C0_no_indepdendent(self):
+        warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
         foldrules = nf.FoldRules.from_rn2rules(self.rn2rules)
         seed = nf.Params(
             rns = set([]),
@@ -593,6 +595,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         self.assertEqual(expected_rules, result.rules)
         
     def test_FoldMetabolism_rule_order_C0_independent_R0R1(self):
+        warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
         foldrules = nf.FoldRules.from_rn2rules(self.rn2rules)
         seed = nf.Params(
             rns = set(["R0","R1"]),

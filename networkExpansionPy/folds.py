@@ -394,7 +394,7 @@ class FoldMetabolism:
         ################################################
         ## ITERATION 2+
         while keep_going:
-            print("rule_order iteration; time: ", result.iteration, result.iteration_time)
+            print("rule_order iteration (time in sec):{0} ({1})".format(result.iteration, result.iteration_time[result.iteration]))
             size2foldsets = self.sort_remaining_foldsets_by_size(current.folds)
             next_foldset, effects = self.select_next_foldset(algorithm, size2foldsets, current)
 
