@@ -6,7 +6,6 @@ from pprint import pprint
 from collections import Counter
 from datetime import datetime
 import random
-import itertools
 import pickle
 
 asset_path = PurePath(__file__).parent / "assets"
@@ -173,18 +172,22 @@ class Result:
         self.start_time = timeit.default_timer()
         self.iteration_time = dict()
 
-    def first_update(self, current):
+    def first_update(self, current, write=False, path=None, str_to_append_to_fname=None):
         self.update_cpds(current)
         self.update_rns(current)
         self.update_iter()
         self.update_iteration_time()
+        if write==True:
+            temp_write(self, path=None, str_to_append_to_fname=None)
 
-    def update(self, current):
+    def update(self, current, write=False, path=None, str_to_append_to_fname=None):
         self.update_cpds(current)
         self.update_rns(current)
         self.update_folds(current)
         self.update_iter()
         self.update_iteration_time()
+        if write==True:
+            temp_write(self, path=None, str_to_append_to_fname=None)
 
     def update_cpds(self, current):
         for i in current.cpds:
@@ -207,15 +210,45 @@ class Result:
     def update_iter(self):
         self.iteration+=1
 
+    def get_path(self, path=None, str_to_append_to_fname=None):
+        if str_to_append_to_fname == None:
+            fname = self.start_datetime+".pkl"
+        else:
+            fname = self.start_datetime+"_"+str_to_append_to_fname+".pkl"
+        
+        if path==None:
+            path = Path.joinpath(Path.cwd(), "fold_results", fname)
+        else:
+            path = Path.joinpath(path, "fold_results", fname)
+
+        return path
+
+    def temp_write(self, path=None, str_to_append_to_fname=None):
+        ## Doesn't check if overwriting
+
+        path = self.get_path(path, str_to_append_to_fname)
+        path = Path.joinpath(path.parent, path.stem+"_tmp", path.suffix)
+        with open(path, 'wb') as handle:
+            pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def final_write(self, path=None, str_to_append_to_fname=None):
+        
+        path = self.get_path(path, str_to_append_to_fname)
+        
+        i = 0
+        while path.is_file():
+            path = Path.joinpath(path.parent, path.stem+"_"+str(i), path.suffix)
+            i+=1
+
+        with open(path, 'wb') as handle:
+            pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 class Rule:
 
-    id_iter = itertools.count()
-
     def __init__(self,rn,foldset):
-        self.id = next(self.id_iter)
         self.rn = rn
         self.foldset = foldset
+        self.id = (rn, foldset)
 
     def __repr__(self):
         return "id:\t\t{0} \nrn:\t\t{1} \nfoldset:\t{2}".format(self.id, self.rn, self.foldset)
@@ -373,6 +406,7 @@ class FoldMetabolism:
         scope.rns = set([i[0] for i in scope_rns])
         scope.rules = self.f.subset_from_rns(scope.rns)
         scope.folds = scope.rules.folds 
+        print("...done.")
         return ImmutableParams(folds=scope.folds, rns=scope.rns, rules=scope.rules, cpds=scope.cpds)
 
 
@@ -445,13 +479,13 @@ class FoldMetabolism:
     #     return set(cx), set([i[0] for i in rx])
 
 
-    def effect_per_foldset(self, foldset, current_folds, current_cpds):
+    # def effect_per_foldset(self, foldset, current_folds, current_cpds):
 
-        potential_fold_set = (current_folds | set(foldset))
-        # potential_rules = self.f.subset_from_folds(potential_fold_set)
-        # cx,rx = self.fold_expand2(potential_rules.rns, current_cpds)
-        cx,rx = self.fold_expand3(potential_fold_set, current_cpds)
-        return cx, rx
+    #     potential_fold_set = (current_folds | set(foldset))
+    #     # potential_rules = self.f.subset_from_folds(potential_fold_set)
+    #     # cx,rx = self.fold_expand2(potential_rules.rns, current_cpds)
+    #     cx,rx = self.fold_expand3(potential_fold_set, current_cpds)
+    #     return cx, rx
 
 
     def sort_remaining_foldsets_by_size(self, current_folds):#, remaining_rules):
@@ -477,10 +511,11 @@ class FoldMetabolism:
 
                 effects = Params()
 
-                effects.cpds, effects.rns = self.effect_per_foldset(foldset, current.folds, current.cpds)
+                effects.cpds, effects.rns = self.fold_expand3((current.folds | set(foldset)), current.cpds)
+                # effects.cpds, effects.rns = self.effect_per_foldset(foldset, current.folds, current.cpds)
                 effects.rules = self.f.subset_from_rns(effects.rns)
 
-                n_new = len(getattr(effects, key_to_maximize) - getattr(current,key_to_maximize))
+                n_new = len(getattr(effects, key_to_maximize)) - len(getattr(current, key_to_maximize))
 
                 if n_new == max_v:
                     max_effects[foldset] = effects
@@ -520,18 +555,17 @@ class FoldMetabolism:
         else:
             return True
 
-    def rule_order(self, algorithm="max_rules"):
+    def rule_order(self, algorithm="max_rules", write=False, path=None, str_to_append_to_fname=None):
 
         ## Place to store results and current state of expansion
-        result = Result()
-        current = Params(folds=self.seed.folds, cpds=self.seed.cpds, set([]), rules=self.scope.rules.subset_from_folds(self.seed.folds))
-        
         ## ITERATION 0 (Avoid updating folds on the 0th iteration since they don't apply until iteration=1)
-        result.first_update(current)
+        result = Result()
+        current = Params(folds=self.seed.folds, cpds=self.seed.cpds, rns=seed.rns, rules=self.scope.rules.subset_from_folds(self.seed.folds))
+        result.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
         ## ITERATION 1 (using only seed folds and fold independent reactions)
         current.cpds, current.rns = self.fold_expand3(current.folds, current.cpds)
-        result.update(current)
+        result.update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
         ## Needed in case expansion not possible at all
         keep_going = self.keep_going(current)
@@ -553,7 +587,10 @@ class FoldMetabolism:
                 current.rns = effects.rns
                 
             ## Store when cpds and rns appear in the expansion
-            result.update(current)
+            result.update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
+
+        if write:
+            result.final_write(path=path, str_to_append_to_fname=str_to_append_to_fname)
 
         return result
 
