@@ -4,8 +4,10 @@ from copy import copy, deepcopy
 import timeit
 from pprint import pprint
 from collections import Counter
+from datetime import datetime
 import random
 import itertools
+import pickle
 
 asset_path = PurePath(__file__).parent / "assets"
 
@@ -76,43 +78,87 @@ asset_path = PurePath(__file__).parent / "assets"
 #         self.rns = set(rn2rules.keys()) ## reactions in fold network only
 #         self.folds = set([i for fs in self.rule2rns.keys() for i in fs]) ## all folds
 #         self.fold_independent_rns = fold_independent_rns
-class Current:
-
-    ## I should use this kind of object to store informaiton about the: remaining, scope, and maybe seeds?
+class ImmutableParams:
 
     def __init__(self, folds=None, cpds=None, rns=None, rules=None):
-        self.folds = folds
-        self.cpds = cpds
-        self.rns = rns
-        self.rules = rules
+        self._folds = deepcopy(folds)
+        self._cpds = deepcopy(cpds)
+        self._rns = deepcopy(rns)
+        self._rules = deepcopy(rules)
 
     @property
     def folds(self):
         return self._folds
-    @folds.setter
-    def folds(self, value):
-        self._folds = deepcopy(value)
 
     @property
     def cpds(self):
         return self._cpds
-    @cpds.setter
-    def cpds(self, value):
-        self._cpds = deepcopy(value)
 
     @property
     def rns(self):
         return self._rns
-    @rns.setter
-    def rns(self, value):
-        self._rns = deepcopy(value)
 
     @property
     def rules(self):
         return self._rules
-    @rules.setter
+
+class Params(ImmutableParams):
+
+    ## I should use this kind of object to store informaiton about the: remaining, scope, and maybe seeds?
+
+    @ImmutableParams.folds.setter
+    def folds(self, value):
+        self._folds = deepcopy(value)
+
+    @ImmutableParams.cpds.setter
+    def cpds(self, value):
+        self._cpds = deepcopy(value)
+
+    @ImmutableParams.rns.setter
+    def rns(self, value):
+        self._rns = deepcopy(value)
+
+    @ImmutableParams.rules.setter
     def rules(self, value):
         self._rules = deepcopy(value)
+
+# class Params:
+
+#     ## I should use this kind of object to store informaiton about the: remaining, scope, and maybe seeds?
+
+#     def __init__(self, folds=None, cpds=None, rns=None, rules=None):
+#         self.folds = folds
+#         self.cpds = cpds
+#         self.rns = rns
+#         self.rules = rules
+
+#     @property
+#     def folds(self):
+#         return self._folds
+#     @folds.setter
+#     def folds(self, value):
+#         self._folds = deepcopy(value)
+
+#     @property
+#     def cpds(self):
+#         return self._cpds
+#     @cpds.setter
+#     def cpds(self, value):
+#         self._cpds = deepcopy(value)
+
+#     @property
+#     def rns(self):
+#         return self._rns
+#     @rns.setter
+#     def rns(self, value):
+#         self._rns = deepcopy(value)
+
+#     @property
+#     def rules(self):
+#         return self._rules
+#     @rules.setter
+#     def rules(self, value):
+#         self._rules = deepcopy(value)
 
 
 class Result:
@@ -123,6 +169,7 @@ class Result:
         self.cpds = dict()
         self.rns = dict()
         self.folds = {"fold_independent":0}
+        self.start_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.start_time = timeit.default_timer()
         self.iteration_time = dict()
 
@@ -245,7 +292,7 @@ class FoldMetabolism:
     A class to do fold expansion from a metabolism, foldrules, and seeds.
     """
 
-    def __init__(self, metabolism, foldrules, fold_independent_rns, preexpansion=False):
+    def __init__(self, metabolism, foldrules, seed):#, preexpansion=False):
         """
         Calculates expansion scope after seed compounds are defined. 
 
@@ -256,13 +303,17 @@ class FoldMetabolism:
         
         self._m = metabolism ## GlobalMetabolicNetwork object
         self._f = foldrules # FoldRules object
+        self._seed = ImmutableParams(folds=seed.folds, rns=seed.rns, cpds=seed.cpds) ## seed.rns == fold_independent_rns; don't modify via seed.cpds=foo, etc after init
 
-        self.fold_independent_rns = fold_independent_rns
-        self.seed_folds = None
-        self._seed_cpds = None
+        # self.fold_independent_rns = fold_independent_rns ## I think we could think of these as seed reactions if we want
+        # self.seed_folds = None
+        # self._seed_cpds = None
 
 
-        self.scope = Current()
+
+
+        self._scope = self.calculate_scope(seed)
+        # self.calculate_scope(seed)
         # self.scope.rules = None
         # self.scope.cpds = None
         # self.scope.rns = None
@@ -275,7 +326,6 @@ class FoldMetabolism:
     @property 
     def metabolism(self):
         return self._m
-    
     @property 
     def m(self):
         return self._m
@@ -283,40 +333,70 @@ class FoldMetabolism:
     @property 
     def foldrules(self):
         return self._f
-    
     @property 
     def f(self):
         return self._f
 
-    ## Changing the seed_cpds after initializations recalcuates scope properties
     @property
-    def seed_cpds(self):
-        return self._seed_cpds
+    def seed(self):
+        return self._seed
 
-    @seed_cpds.setter
-    def seed_cpds(self, seed_cpds):
-        """
-        Calculates properties associated with seed compounds if setting to a new set of seeds
-        """
-        if (self._seed_cpds == None) or (self._seed_cpds != seed_cpds):
-            self._seed_cpds = seed_cpds 
-            self.scope.cpds, self.scope.rns = self.calculate_scope(self._seed_cpds)
-            self.scope.rules = self.f.subset_from_rns(self.scope.rns)
-            self.scope.folds = self.scope.rules.folds 
+    ## Changing the seed_cpds after initializations recalcuates scope properties
+    # @property
+    # def seed_cpds(self):
+    #     return self._seed_cpds
 
-        else:
-            pass 
+    # @seed_cpds.setter
+    # def seed_cpds(self, seed_cpds):
+    #     """
+    #     Calculates properties associated with seed compounds if setting to a new set of seeds
+    #     """
+    #     if (self._seed_cpds == None) or (self._seed_cpds != seed_cpds):
+    #         self._seed_cpds = seed_cpds 
+    #         self.scope.cpds, self.scope.rns = self.calculate_scope(self._seed_cpds)
+    #         self.scope.rules = self.f.subset_from_rns(self.scope.rns)
+    #         self.scope.folds = self.scope.rules.folds 
+
+    #     else:
+    #         pass 
+    @property 
+    def scope(self):
+        return self._scope
+    # @scope.setter
+    def calculate_scope(self, seed):
+        print("calculating scope...")
+        rn_tup_set = set(self.m.rxns2tuple((self.f.rns | self.seed.rns)))
+        scope_cpds, scope_rns = self.m.expand(seed.cpds, reaction_mask=rn_tup_set)
+
+        scope = Params()
+        scope.cpds = set(scope_cpds)
+        scope.rns = set([i[0] for i in scope_rns])
+        scope.rules = self.f.subset_from_rns(scope.rns)
+        scope.folds = scope.rules.folds 
+        return ImmutableParams(folds=scope.folds, rns=scope.rns, rules=scope.rules, cpds=scope.cpds)
+
+
+
+    # @seed.setter
+    # def seed(self, value):
+    #     """
+    #     Calculates properties associated with seed compounds if setting to a new set of seeds
+    #     """
+        
+    #     self.scope.cpds, self.scope.rns = self.calculate_scope(self.value.cpds)
+    #     self.scope.rules = self.f.subset_from_rns(self.scope.rns)
+    #     self.scope.folds = self.scope.rules.folds 
                 
-    def calculate_scope(self, seed_cpds):
-        """
-        Calculate the scope of the seed_cpds with all reactions enabled by the global fold network (including fold_independent reactions)
+    # def calculate_scope(self, seed):
+    #     """
+    #     Calculate the scope of the seed_cpds with all reactions enabled by the global fold network (including fold_independent reactions)
 
-        :param seed_cpds: collection of compound ids
-        :return: set of compounds and set of reactions in the scope
-        """
-        rn_tup_set = set(self.m.rxns2tuple((self.f.rns | self.fold_independent_rns)))
-        scope.cpds, scope.rns = self.m.expand(seed_cpds, reaction_mask=rn_tup_set)
-        return set(scope.cpds), set([i[0] for i in scope.rns])
+    #     :param seed_cpds: collection of compound ids
+    #     :return: set of compounds and set of reactions in the scope
+    #     """
+    #     rn_tup_set = set(self.m.rxns2tuple((self.f.rns | self.seed.rns)))
+    #     scope.cpds, scope.rns = self.m.expand(seed.cpds, reaction_mask=rn_tup_set)
+    #     return set(scope.cpds), set([i[0] for i in scope.rns])
 
     # def fold_expand(self, rule2rns, cpds):
     #     """
@@ -354,7 +434,7 @@ class FoldMetabolism:
     def fold_expand3(self, folds, current_cpds):
 
         active_rules = self.f.subset_from_folds(folds)
-        rn_tup_set = set(self.m.rxns2tuple(active_rules.rns | self.fold_independent_rns))
+        rn_tup_set = set(self.m.rxns2tuple(active_rules.rns | self.seed.rns))
         cx,rx = self.m.expand(current_cpds, reaction_mask=rn_tup_set)
         return set(cx), set([i[0] for i in rx])
 
@@ -395,7 +475,7 @@ class FoldMetabolism:
 
             for foldset in foldsets:
 
-                effects = Current()
+                effects = Params()
 
                 effects.cpds, effects.rns = self.effect_per_foldset(foldset, current.folds, current.cpds)
                 effects.rules = self.f.subset_from_rns(effects.rns)
@@ -444,7 +524,7 @@ class FoldMetabolism:
 
         ## Place to store results and current state of expansion
         result = Result()
-        current = Current(self.seed_folds, self.seed_cpds, set([]), self.scope.rules.subset_from_folds(self.seed_folds))
+        current = Params(folds=self.seed.folds, cpds=self.seed.cpds, set([]), rules=self.scope.rules.subset_from_folds(self.seed.folds))
         
         ## ITERATION 0 (Avoid updating folds on the 0th iteration since they don't apply until iteration=1)
         result.first_update(current)
