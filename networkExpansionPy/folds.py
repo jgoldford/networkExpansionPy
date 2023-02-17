@@ -168,6 +168,7 @@ class Result:
         self.cpds = dict()
         self.rns = dict()
         self.folds = {"fold_independent":0}
+        self.rules = dict()
         self.start_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.start_time = timeit.default_timer()
         self.iteration_time = dict()
@@ -184,6 +185,7 @@ class Result:
         self.update_cpds(current)
         self.update_rns(current)
         self.update_folds(current)
+        self.update_rules(current)
         self.update_iter()
         self.update_iteration_time()
         if write==True:
@@ -203,6 +205,11 @@ class Result:
         for i in current.folds:
             if i not in self.folds:
                 self.folds[i] = self.iteration
+
+    def update_rules(self, current):
+        for i in current.rules.ids:
+            if i not in self.rules:
+                self.rules[i] = self.iteration
 
     def update_iteration_time(self):
         self.iteration_time[self.iteration] =  timeit.default_timer() - self.start_time
@@ -260,6 +267,7 @@ class FoldRules:
         self._rns = None
         self._folds = None 
         self._foldsets = None
+        self._ids = None
         # self.rn2rule = self.rn2rule()
         # self.fs2rule = self.fs2rule()
         # self.rns = self.rns()
@@ -302,6 +310,12 @@ class FoldRules:
             self._foldsets = set([r.foldset for r in self.rules])
         return self._foldsets
 
+    @property 
+    def ids(self):
+        if self._ids == None:
+            self._ids = set([r.id for r in self.rules])
+        return self._ids
+
     def subset_from_rns(self, rns):
         return FoldRules([r for r in self.rules if r.rn in rns])
         # return FoldRules([self.rn2rule[r] for r in rns])
@@ -312,6 +326,12 @@ class FoldRules:
 
     def remaining_rules(self, current_folds):
         return FoldRules([r for r in self.rules if len(r.foldset-current_folds)>0])
+
+    def to_list(self):
+        return [r for r in self.rules]
+
+    def __len__(self):
+        return len(self.ids)
 
     # def rn2rule(self):
     #     return {r.rn:r for r in self.rules}
@@ -532,7 +552,7 @@ class FoldMetabolism:
 
         return max_effects
 
-    def select_next_foldset(algorithm, size2foldsets, current):
+    def select_next_foldset(self, algorithm, size2foldsets, current):
         
         if algorithm == "max_rules":
             max_effects = self.loop_through_remaining_foldsets(size2foldsets, current, "rules")
@@ -544,7 +564,7 @@ class FoldMetabolism:
                 next_foldset = random.choice(sorted(max_effects.keys()))
             return next_foldset, max_effects[next_foldset]
 
-    def keepgoing(self, current):
+    def keep_going(self, current):
 
         ## It should always stop if we've found all scope cpds, rns
         ## actually it might be possible to discover all reactions and compounds but not all rules
@@ -560,7 +580,7 @@ class FoldMetabolism:
         ## Place to store results and current state of expansion
         ## ITERATION 0 (Avoid updating folds on the 0th iteration since they don't apply until iteration=1)
         result = Result()
-        current = Params(folds=self.seed.folds, cpds=self.seed.cpds, rns=seed.rns, rules=self.scope.rules.subset_from_folds(self.seed.folds))
+        current = Params(folds=self.seed.folds, cpds=self.seed.cpds, rns=self.seed.rns, rules=self.scope.rules.subset_from_folds(self.seed.folds))
         result.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
         ## ITERATION 1 (using only seed folds and fold independent reactions)
@@ -572,9 +592,9 @@ class FoldMetabolism:
 
         ################################################
         ## ITERATION 2+
-        while keepgoing:
+        while keep_going:
             print("rule_order iteration; time: ", result.iteration, result.iteration_time)
-            size2foldsets = sort_remaining_foldsets_by_size(current.folds)
+            size2foldsets = self.sort_remaining_foldsets_by_size(current.folds)
             next_foldset, effects = self.select_next_foldset(algorithm, size2foldsets, current)
 
             keep_going = self.keep_going(current)
@@ -863,28 +883,33 @@ class FoldMetabolism:
     #     return current, iteration_dict, metadict
 
 def example_main():
-    ## Load metabolism
+    asset_path = nf.asset_path
+
+    ALGORITHM = "max_rules"
+    WRITE = False
+    PATH = None
+    STR_TO_APPEND_TO_FNAME = "EXAMPLE"
+
+    ## Metabolism
     metabolism_path = PurePath(asset_path) / "metabolic_networks" / 'metabolism.23Aug2022.pkl'
     metabolism = pd.read_pickle(metabolism_path)
-    
-    ## Load fold rules
-    # rn2rules_db_path = PurePath("data", "rn2fold", "_db.pkl")
-    # rn2rules_db = pd.read_pickle(rn2rules_db_path)
 
-    # rn2rules_path = rn2rules_db.iloc[4]["OUTPUT_PATH"]
-    # rn2rules = pd.read_pickle(rn2rules_path)
-    rn2rules_path = PurePath("data", "rn2fold", "rn2rules_v.pkl")
-    rn2rules = pd.read_pickle(rn2rules_path)
-    foldrules = nf.FoldRules(rn2rules)
+    ## FoldRules
+    rn2rules = pd.read_pickle(PurePath("data","rn2fold","rn2rules_v.pkl"))
+    foldrules = nf.FoldRules.from_rn2rules(rn2rules)
 
-    fold_independent_rns = set(metabolism.network["rn"]) - foldrules.rns()
-    ## Inititalize fold metabolism
-    fm = nf.FoldMetabolism(metabolism, foldrules, fold_independent_rns)
-
+    ## Seed
+    fold_independent_rns =  set(metabolism.network["rn"]) - set(rn2rules)
     seed_cpds_path = PurePath("data", "josh", "seed_set.csv")
-    fm.seed_cpds = set((pd.read_csv(seed_cpds_path)["ID"]))
-    fm.seed_folds = set(['spontaneous'])
+    seed_cpds = set((pd.read_csv(seed_cpds_path)["ID"])) #| aa_cids
+    seed = nf.Params(
+        rns = fold_independent_rns,
+        cpds = seed_cpds,
+        folds = set(['spontaneous'])
+    )
 
+    ## Inititalize fold metabolism
+    fm = nf.FoldMetabolism(metabolism, foldrules, seed)
     ## Run fold expansion
-    current, iteration_dict, metadict = fm.rule_order()
+    result = fm.rule_order(algorithm=ALGORITHM, write=WRITE, path=PATH, str_to_append_to_fname=STR_TO_APPEND_TO_FNAME)
     
