@@ -756,6 +756,81 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         self.assertEqual(expected_folds, result.folds)
         self.assertEqual(expected_rules, result.rules)
 
+    def test_write_results(self):
+
+        random.seed(3141)
+        warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
+        foldrules = nf.FoldRules.from_rn2rules(self.rn2rules)
+        seed = nf.Params(
+            rns = set(["R0","R1"]),
+            cpds = set(['C0']),
+            folds = set([])
+        )
+
+        fm = nf.FoldMetabolism(self.met, foldrules, seed)
+        result = fm.rule_order(algorithm="max_rules", write=True)
+
+        expected_cpds = {'C0': 0,
+                        'C1': 1,
+                        'C2': 1,
+                        'C3': 2,
+                        'C4': 3,
+                        'C5': 4,
+                        'C6': 5,
+                        'C7': 6,
+                        'C8': 7,
+                        'C9': 8,
+                        'C10': 9}
+        
+        expected_rns = {'R0': 0,
+                        'R1': 0,
+                        'R2': 2,
+                        'R3': 3,
+                        'R4': 4,
+                        'R5': 5,
+                        'R6': 6,
+                        'R7': 7,
+                        'R8': 8,
+                        'R9': 9}
+
+        expected_folds = {'fold_independent': 0, 
+                        'F0': 11, # these two folds are last because they only give 2 rules 
+                        'F1': 10, # these two folds are last because they only give 2 rules 
+                        'F2': 2,
+                        'F3': 3,
+                        'F4': 4,
+                        'F5': 5,
+                        'F6': 6,
+                        'F7': 7,
+                        'F8': 8,
+                        'F9': 9}
+
+        expected_rules = {("R0", frozenset({'F0'})):11,
+                        ("R1", frozenset({'F1'})):10,
+                        ("R2", frozenset({'F2'})):2,
+                        ("R3", frozenset({'F3'})):3,
+                        ("R4", frozenset({'F4'})):4,
+                        ("R5", frozenset({'F5'})):5,
+                        ("R6", frozenset({'F6'})):6,
+                        ("R7", frozenset({'F7'})):7,
+                        ("R8", frozenset({'F8'})):8,
+                        ("R9", frozenset({'F9'})):9}
+
+        final_result = pd.read_pickle(result.final_path)
+        temp_result = pd.read_pickle(result.temp_path)
+
+        self.assertEqual(final_result.cpds, expected_cpds)
+        self.assertEqual(final_result.rns, expected_rns)
+        self.assertEqual(final_result.folds, expected_folds)
+        self.assertEqual(final_result.rules, expected_rules)
+
+        self.assertEqual(final_result.cpds, temp_result.cpds)
+        self.assertEqual(final_result.rns, temp_result.rns)
+        self.assertEqual(final_result.folds, temp_result.folds)
+        self.assertEqual(final_result.rules, temp_result.rules)
+
+        # pd.read_pickle("fold_results.")
+
 #     def test_FoldMetabolism_rule_order_C0_independent_R3R5(self):
 #         fold_independent_rns = set(["R3","R5"])
 #         foldrules = nf.FoldRules(self.rn2rules, fold_independent_rns)

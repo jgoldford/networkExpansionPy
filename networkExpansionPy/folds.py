@@ -69,7 +69,6 @@ class Result:
 
     def __init__(self):
         self.iteration = 0
-        self.runtime = dict()  
         self.cpds = dict()
         self.rns = dict()
         self.folds = {"fold_independent":0}
@@ -77,6 +76,8 @@ class Result:
         self.start_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.start_time = timeit.default_timer()
         self.iteration_time = dict()
+        self.final_path = None
+        self.temp_path = None
 
     def first_update(self, current, write=False, path=None, str_to_append_to_fname=None):
         self.update_cpds(current)
@@ -84,7 +85,7 @@ class Result:
         self.update_iter()
         self.update_iteration_time()
         if write==True:
-            temp_write(self, path=path, str_to_append_to_fname=str_to_append_to_fname)
+            self.temp_write(path=path, str_to_append_to_fname=str_to_append_to_fname)
 
     def update(self, current, write=False, path=None, str_to_append_to_fname=None):
         self.update_folds(current)
@@ -134,9 +135,13 @@ class Result:
         ## Doesn't check if overwriting
 
         path = self.get_path(path, str_to_append_to_fname)
-        path = Path.joinpath(path.parent, path.stem+"_tmp", path.suffix)
+        path = Path.joinpath(path.parent, path.stem+"_tmp"+path.suffix)
+        path.parent.mkdir(parents=True, exist_ok=True) 
         with open(path, 'wb') as handle:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        
+        if self.temp_path == None:
+            self.temp_path = str(path)
 
     def final_write(self, path=None, str_to_append_to_fname=None):
         
@@ -144,11 +149,14 @@ class Result:
         
         i = 0
         while path.is_file():
-            path = Path.joinpath(path.parent, path.stem+"_"+str(i), path.suffix)
+            path = Path.joinpath(path.parent, path.stem+"_"+str(i)+path.suffix)
             i+=1
 
+        path.parent.mkdir(parents=True, exist_ok=True) 
         with open(path, 'wb') as handle:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        self.final_path = str(path)
 
 class Rule:
 
@@ -367,7 +375,7 @@ class FoldMetabolism:
             if len(max_effects) == 0:
                 next_foldset = frozenset()
                 max_effects[next_foldset] = deepcopy(current)
-                print("NO max_effects REMAINING")
+                print("No foldsets remaining.")
             else:
                 foldset_tuples = sorted([sorted(tuple(i)) for i in max_effects.keys()]) ## cast as tuples for predictable sorting
                 next_foldset = frozenset(random.choice(foldset_tuples)) ## change back to frozenset
@@ -379,6 +387,7 @@ class FoldMetabolism:
         ## actually it might be possible to discover all reactions and compounds but not all rules
         ## but if we've discovered all folds then we've discovered all rules
         if (current.cpds == self.scope.cpds) and (current.rns == self.scope.rns) and (current.folds == self.scope.folds):
+            print("Reached scope compounds, reactions, and folds.")
             return False
 
         else:
