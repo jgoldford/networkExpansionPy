@@ -7,9 +7,10 @@ from pprint import pprint
 import random
 
 import warnings
-# warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
-
+# warnings.filterwarnings('ignore', category=SparseEfficiencyWarning) ## must be applied within each test
+unittest.defaultTestLoader.sortTestMethodsUsing = lambda *args: -1 ## run tests in order defined within this file
 random.seed(3141)
+
 # from pandas.testing import assert_frame_equal
 
 # class TestIndependentFunctions(unittest.TestCase):
@@ -543,141 +544,217 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         )
 
         fm = nf.FoldMetabolism(self.met, foldrules, seed)
-        pprint(fm.sort_remaining_foldsets_by_size(fm.seed.folds))
+        expected_foldsets_by_size = {
+            1: [frozenset({'F0'}),
+                frozenset({'F1'}),
+                frozenset({'F2'}),
+                frozenset({'F3'}),
+                frozenset({'F4'}),
+                frozenset({'F5'}),
+                frozenset({'F6'}),
+                frozenset({'F7'}),
+                frozenset({'F8'}),
+                frozenset({'F9'})]}
 
-    # def test_FoldMetabolism_rule_order_C0_no_indepdendent(self):
-    #     warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
-    #     foldrules = nf.FoldRules.from_rn2rules(self.rn2rules)
-    #     seed = nf.Params(
-    #         rns = set([]),
-    #         cpds = set(['C0']),
-    #         folds = set([])
-    #     )
+        self.assertEqual(expected_foldsets_by_size, fm.sort_remaining_foldsets_by_size(fm.seed.folds))
 
-    #     fm = nf.FoldMetabolism(self.met, foldrules, seed)
-    #     result = fm.rule_order(algorithm="max_rules")
+    def test_sort_foldsets_by_size(self):
+        foldrules = nf.FoldRules.from_rn2rules(self.rn2rules)
+        seed = nf.Params(
+            rns = set([]),
+            cpds = set(['C0']),
+            folds = set([])
+        )
 
-    #     expected_cpds = {'C0': 0,
-    #                     'C1': 2,
-    #                     'C2': 3,
-    #                     'C3': 4,
-    #                     'C4': 5,
-    #                     'C5': 6,
-    #                     'C6': 7,
-    #                     'C7': 8,
-    #                     'C8': 9,
-    #                     'C9': 10,
-    #                     'C10': 11}
-    #     expected_rns = {'R0': 2,
-    #                     'R1': 3,
-    #                     'R2': 4,
-    #                     'R3': 5,
-    #                     'R4': 6,
-    #                     'R5': 7,
-    #                     'R6': 8,
-    #                     'R7': 9,
-    #                     'R8': 10,
-    #                     'R9': 11}
-    #     expected_folds = {'fold_independent': 0,
-    #                     'F0': 2,
-    #                     'F1': 3,
-    #                     'F2': 4,
-    #                     'F3': 5,
-    #                     'F4': 6,
-    #                     'F5': 7,
-    #                     'F6': 8,
-    #                     'F7': 9,
-    #                     'F8': 10,
-    #                     'F9': 11}
+        fm = nf.FoldMetabolism(self.met, foldrules, seed)
 
-    #     expected_rules = {("R0", frozenset({'F0'})):2,
-    #                     ("R1", frozenset({'F1'})):3,
-    #                     ("R2", frozenset({'F2'})):4,
-    #                     ("R3", frozenset({'F3'})):5,
-    #                     ("R4", frozenset({'F4'})):6,
-    #                     ("R5", frozenset({'F5'})):7,
-    #                     ("R6", frozenset({'F6'})):8,
-    #                     ("R7", frozenset({'F7'})):9,
-    #                     ("R8", frozenset({'F8'})):10,
-    #                     ("R9", frozenset({'F9'})):11}
+        foldsets = [
+            frozenset({'F6','F1'}),
+            frozenset({'F0'}),
+            frozenset({'F5'}),
+            frozenset({'F1', 'F7'}),
+            frozenset({'F3'}),
+            frozenset({'F7'}),
+            frozenset({'F8'}),
+            frozenset({'F9'}),
+            frozenset({'F4'}),
+            frozenset({'F2'})]
 
-    #     self.assertEqual(expected_cpds, result.cpds)
-    #     self.assertEqual(expected_rns, result.rns)
-    #     self.assertEqual(expected_folds, result.folds)
-    #     self.assertEqual(expected_rules, result.rules)
+        expected_foldsets_by_size = {
+            1: [frozenset({'F0'}),
+                frozenset({'F2'}),
+                frozenset({'F3'}),
+                frozenset({'F4'}),
+                frozenset({'F5'}),
+                frozenset({'F7'}),
+                frozenset({'F8'}),
+                frozenset({'F9'})],
+            2: [frozenset({'F1', 'F6'}),
+                frozenset({'F1', 'F7'})]}
+
+        self.assertEqual(expected_foldsets_by_size, fm.sort_foldsets_by_size(foldsets))
+
+    def test_loop_through_remaining_foldsets(self):
+        foldrules = nf.FoldRules.from_rn2rules(self.rn2rules)
+        seed = nf.Params(
+            rns = set([]),
+            cpds = set(['C0']),
+            folds = set([])
+        )
+
+        fm = nf.FoldMetabolism(self.met, foldrules, seed)
+        current = nf.Params(folds=fm.seed.folds, cpds=fm.seed.cpds, rns=fm.seed.rns, rules=fm.scope.rules.subset_from_folds(fm.seed.folds))
+        size2foldsets = fm.sort_remaining_foldsets_by_size(current.folds)
+        key_to_maximize = "rules"
         
-    # def test_FoldMetabolism_rule_order_C0_independent_R0R1(self):
-    #     warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
-    #     foldrules = nf.FoldRules.from_rn2rules(self.rn2rules)
-    #     seed = nf.Params(
-    #         rns = set(["R0","R1"]),
-    #         cpds = set(['C0']),
-    #         folds = set([])
-    #     )
+        max_effects = fm.loop_through_remaining_foldsets(size2foldsets, current, key_to_maximize)
 
-    #     fm = nf.FoldMetabolism(self.met, foldrules, seed)
-    #     result = fm.rule_order(algorithm="max_rules")
+        self.assertTrue(frozenset({"F0"}) in max_effects)
+        self.assertEqual(max_effects[frozenset({'F0'})].cpds, {'C1', 'C0'})
+        self.assertEqual(max_effects[frozenset({'F0'})].rns, {'R0'})
+        self.assertEqual(max_effects[frozenset({'F0'})].folds, None)
+        self.assertEqual(max_effects[frozenset({'F0'})].rules.ids, {('R0', frozenset({'F0'}))} )
 
-    #     expected_cpds = {'C0': 0,
-    #                     'C1': 1,
-    #                     'C2': 1,
-    #                     'C3': 2,
-    #                     'C4': 3,
-    #                     'C5': 4,
-    #                     'C6': 5,
-    #                     'C7': 6,
-    #                     'C8': 7,
-    #                     'C9': 8,
-    #                     'C10': 9}
+    def test_select_next_foldset(self):
+        foldrules = nf.FoldRules.from_rn2rules(self.rn2rules)
+        seed = nf.Params(
+            rns = set([]),
+            cpds = set(['C0']),
+            folds = set([])
+        )
+
+        fm = nf.FoldMetabolism(self.met, foldrules, seed)
+        current = nf.Params(folds=fm.seed.folds, cpds=fm.seed.cpds, rns=fm.seed.rns, rules=fm.scope.rules.subset_from_folds(fm.seed.folds))
+        size2foldsets = fm.sort_remaining_foldsets_by_size(current.folds)
+        algorithm = "max_rules"
+
+        next_foldset, effects = fm.select_next_foldset(algorithm, size2foldsets, current)
+        self.assertEqual(next_foldset, frozenset({'F0'}))
+
+    def test_FoldMetabolism_rule_order_C0_no_indepdendent(self):
+        warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
+        foldrules = nf.FoldRules.from_rn2rules(self.rn2rules)
+        seed = nf.Params(
+            rns = set([]),
+            cpds = set(['C0']),
+            folds = set([])
+        )
+
+        fm = nf.FoldMetabolism(self.met, foldrules, seed)
+        result = fm.rule_order(algorithm="max_rules")
+
+        expected_cpds = {'C0': 0,
+                        'C1': 2,
+                        'C2': 3,
+                        'C3': 4,
+                        'C4': 5,
+                        'C5': 6,
+                        'C6': 7,
+                        'C7': 8,
+                        'C8': 9,
+                        'C9': 10,
+                        'C10': 11}
+        expected_rns = {'R0': 2,
+                        'R1': 3,
+                        'R2': 4,
+                        'R3': 5,
+                        'R4': 6,
+                        'R5': 7,
+                        'R6': 8,
+                        'R7': 9,
+                        'R8': 10,
+                        'R9': 11}
+        expected_folds = {'fold_independent': 0,
+                        'F0': 2,
+                        'F1': 3,
+                        'F2': 4,
+                        'F3': 5,
+                        'F4': 6,
+                        'F5': 7,
+                        'F6': 8,
+                        'F7': 9,
+                        'F8': 10,
+                        'F9': 11}
+
+        expected_rules = {("R0", frozenset({'F0'})):2,
+                        ("R1", frozenset({'F1'})):3,
+                        ("R2", frozenset({'F2'})):4,
+                        ("R3", frozenset({'F3'})):5,
+                        ("R4", frozenset({'F4'})):6,
+                        ("R5", frozenset({'F5'})):7,
+                        ("R6", frozenset({'F6'})):8,
+                        ("R7", frozenset({'F7'})):9,
+                        ("R8", frozenset({'F8'})):10,
+                        ("R9", frozenset({'F9'})):11}
+
+        self.assertEqual(expected_cpds, result.cpds)
+        self.assertEqual(expected_rns, result.rns)
+        self.assertEqual(expected_folds, result.folds)
+        self.assertEqual(expected_rules, result.rules)
         
-    #     expected_rns = {'R0': 0,
-    #                     'R1': 0,
-    #                     'R2': 2,
-    #                     'R3': 3,
-    #                     'R4': 4,
-    #                     'R5': 5,
-    #                     'R6': 6,
-    #                     'R7': 7,
-    #                     'R8': 8,
-    #                     'R9': 9}
+    def test_FoldMetabolism_rule_order_C0_independent_R0R1(self):
+        random.seed(3141)
+        warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
+        foldrules = nf.FoldRules.from_rn2rules(self.rn2rules)
+        seed = nf.Params(
+            rns = set(["R0","R1"]),
+            cpds = set(['C0']),
+            folds = set([])
+        )
 
-    #     expected_folds = {'fold_independent': 0,
-    #                     'F0': 2,
-    #                     'F1': 3,
-    #                     'F2': 4,
-    #                     'F3': 5,
-    #                     'F4': 6,
-    #                     'F5': 7,
-    #                     'F6': 8,
-    #                     'F7': 9,
-    #                     'F8': 10,
-    #                     'F9': 11}
+        fm = nf.FoldMetabolism(self.met, foldrules, seed)
+        result = fm.rule_order(algorithm="max_rules", debug=False)
 
-    #     expected_rules = {("R0", frozenset({'F0'})):2,
-    #                     ("R1", frozenset({'F1'})):3,
-    #                     ("R2", frozenset({'F2'})):4,
-    #                     ("R3", frozenset({'F3'})):5,
-    #                     ("R4", frozenset({'F4'})):6,
-    #                     ("R5", frozenset({'F5'})):7,
-    #                     ("R6", frozenset({'F6'})):8,
-    #                     ("R7", frozenset({'F7'})):9,
-    #                     ("R8", frozenset({'F8'})):10,
-    #                     ("R9", frozenset({'F9'})):11}
-
-    #     self.assertEqual(expected_cpds, result.cpds)
-    #     self.assertEqual(expected_rns, result.rns)
-
-    #     print()
-    #     print(result.folds)
-    #     print()
-    #     self.assertEqual(expected_folds, result.folds)
+        expected_cpds = {'C0': 0,
+                        'C1': 1,
+                        'C2': 1,
+                        'C3': 2,
+                        'C4': 3,
+                        'C5': 4,
+                        'C6': 5,
+                        'C7': 6,
+                        'C8': 7,
+                        'C9': 8,
+                        'C10': 9}
         
-        # self.assertEqual(expected_rules, result.rules)
+        expected_rns = {'R0': 0,
+                        'R1': 0,
+                        'R2': 2,
+                        'R3': 3,
+                        'R4': 4,
+                        'R5': 5,
+                        'R6': 6,
+                        'R7': 7,
+                        'R8': 8,
+                        'R9': 9}
 
+        expected_folds = {'fold_independent': 0, 
+                        'F0': 11, # these two folds are last because they only give 2 rules 
+                        'F1': 10, # these two folds are last because they only give 2 rules 
+                        'F2': 2,
+                        'F3': 3,
+                        'F4': 4,
+                        'F5': 5,
+                        'F6': 6,
+                        'F7': 7,
+                        'F8': 8,
+                        'F9': 9}
 
+        expected_rules = {("R0", frozenset({'F0'})):11,
+                        ("R1", frozenset({'F1'})):10,
+                        ("R2", frozenset({'F2'})):2,
+                        ("R3", frozenset({'F3'})):3,
+                        ("R4", frozenset({'F4'})):4,
+                        ("R5", frozenset({'F5'})):5,
+                        ("R6", frozenset({'F6'})):6,
+                        ("R7", frozenset({'F7'})):7,
+                        ("R8", frozenset({'F8'})):8,
+                        ("R9", frozenset({'F9'})):9}
 
-
-
+        self.assertEqual(expected_cpds, result.cpds)
+        self.assertEqual(expected_rns, result.rns)
+        self.assertEqual(expected_folds, result.folds)
+        self.assertEqual(expected_rules, result.rules)
 
 #     def test_FoldMetabolism_rule_order_C0_independent_R3R5(self):
 #         fold_independent_rns = set(["R3","R5"])

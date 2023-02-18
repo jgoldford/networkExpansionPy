@@ -310,18 +310,23 @@ class FoldMetabolism:
 
         remaining_rules = self.scope.rules.remaining_rules(current_folds)
         remaining_foldsets = set([i-current_folds for i in remaining_rules.foldsets]) ## excludes folds already discovered
-        rule_sizes = sorted(set([len(i) for i in remaining_foldsets]))
+        return self.sort_foldsets_by_size(remaining_foldsets)
+
+    def sort_foldsets_by_size(self, foldsets):
+        rule_sizes = sorted(set([len(i) for i in foldsets]))
         ## Organizes rules by size
         size2foldsets = {size:list() for size in rule_sizes}
 
-        remaining_foldset_tuples = sorted([sorted(tuple(i)) for i in remaining_foldsets]) ## cast as tuples for predictable sorting
-        for fs in remaining_foldset_tuples: ## sorted for reproduceability
-            size2foldsets[len(fs)].append(frozenset(fs))
+        foldset_tuples = sorted([sorted(tuple(i)) for i in foldsets]) ## cast as tuples for predictable sorting
+        for fs in foldset_tuples: 
+            size2foldsets[len(fs)].append(frozenset(fs)) ## change back to frozenset
 
         return size2foldsets
 
-    def loop_through_remaining_foldsets(self, size2foldsets, current, key_to_maximize):
-        ## key_to_maximize is one of "rns", "cpds", "rule"
+    def loop_through_remaining_foldsets(self, size2foldsets, current, key_to_maximize, debug=False):
+        ## key_to_maximize is one of "rns", "cpds", "rules"
+        if key_to_maximize=="folds":
+            raise(ValueError("It doesn't make sense to choose a fold which maximizes number of folds."))
 
         max_effects = dict()
         max_v = 0
@@ -333,6 +338,9 @@ class FoldMetabolism:
 
                 effects.cpds, effects.rns = self.fold_expand((current.folds | set(foldset)), current.cpds)
                 effects.rules = self.f.subset_from_rns(effects.rns)
+                if debug:
+                    print("foldset ",foldset)
+                    print(effects.rules.ids)
 
                 n_new = len(getattr(effects, key_to_maximize)) - len(getattr(current, key_to_maximize))
 
@@ -348,19 +356,21 @@ class FoldMetabolism:
             ## Don't look for longer rules if shorter rules enable new reactions
             if len(max_effects)>0:
                 break
-
+        if debug:
+            pprint(max_effects)
         return max_effects
 
-    def select_next_foldset(self, algorithm, size2foldsets, current):
+    def select_next_foldset(self, algorithm, size2foldsets, current, debug=False):
         
         if algorithm == "max_rules":
-            max_effects = self.loop_through_remaining_foldsets(size2foldsets, current, "rules")
+            max_effects = self.loop_through_remaining_foldsets(size2foldsets, current, "rules", debug=debug)
             if len(max_effects) == 0:
                 next_foldset = frozenset()
                 max_effects[next_foldset] = deepcopy(current)
                 print("NO max_effects REMAINING")
             else:
-                next_foldset = random.choice(sorted(max_effects.keys()))
+                foldset_tuples = sorted([sorted(tuple(i)) for i in max_effects.keys()]) ## cast as tuples for predictable sorting
+                next_foldset = frozenset(random.choice(foldset_tuples)) ## change back to frozenset
             return next_foldset, max_effects[next_foldset]
 
     def keep_going(self, current):
@@ -374,7 +384,7 @@ class FoldMetabolism:
         else:
             return True
 
-    def rule_order(self, algorithm="max_rules", write=False, path=None, str_to_append_to_fname=None):
+    def rule_order(self, algorithm="max_rules", write=False, path=None, str_to_append_to_fname=None, debug=False):
         """
         Determine the ordering of all rules/folds.
         """
@@ -396,7 +406,7 @@ class FoldMetabolism:
         while keep_going:
             print("rule iter: {} ({:.2} sec)".format(result.iteration, result.iteration_time[result.iteration]))
             size2foldsets = self.sort_remaining_foldsets_by_size(current.folds)
-            next_foldset, effects = self.select_next_foldset(algorithm, size2foldsets, current)
+            next_foldset, effects = self.select_next_foldset(algorithm, size2foldsets, current, debug=debug)
 
             keep_going = self.keep_going(current)
 
