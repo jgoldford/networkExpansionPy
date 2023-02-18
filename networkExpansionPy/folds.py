@@ -63,6 +63,9 @@ class Params(ImmutableParams):
         self._rules = deepcopy(value)
 
 class Result:
+    """
+    Store data from the run
+    """
 
     def __init__(self):
         self.iteration = 0
@@ -81,17 +84,12 @@ class Result:
         self.update_iter()
         self.update_iteration_time()
         if write==True:
-            temp_write(self, path=None, str_to_append_to_fname=None)
+            temp_write(self, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
     def update(self, current, write=False, path=None, str_to_append_to_fname=None):
-        self.update_cpds(current)
-        self.update_rns(current)
         self.update_folds(current)
         self.update_rules(current)
-        self.update_iter()
-        self.update_iteration_time()
-        if write==True:
-            temp_write(self, path=None, str_to_append_to_fname=None)
+        self.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
     def update_cpds(self, current):
         for i in current.cpds:
@@ -292,7 +290,7 @@ class FoldMetabolism:
         print("...done.")
         return ImmutableParams(folds=scope.folds, rns=scope.rns, rules=scope.rules, cpds=scope.cpds)
 
-    def fold_expand3(self, folds, current_cpds):
+    def fold_expand(self, folds, current_cpds):
         """
         Returns a set of compounds and set of reactions enabled by expansion 
         using `current_cpds` and the reactions enabled by `folds` and fold independent 
@@ -315,8 +313,10 @@ class FoldMetabolism:
         rule_sizes = sorted(set([len(i) for i in remaining_foldsets]))
         ## Organizes rules by size
         size2foldsets = {size:list() for size in rule_sizes}
-        for fs in sorted(remaining_foldsets): ## sorted for reproduceability
-            size2foldsets[len(fs)].append(fs)
+
+        remaining_foldset_tuples = sorted([sorted(tuple(i)) for i in remaining_foldsets]) ## cast as tuples for predictable sorting
+        for fs in remaining_foldset_tuples: ## sorted for reproduceability
+            size2foldsets[len(fs)].append(frozenset(fs))
 
         return size2foldsets
 
@@ -331,7 +331,7 @@ class FoldMetabolism:
 
                 effects = Params()
 
-                effects.cpds, effects.rns = self.fold_expand3((current.folds | set(foldset)), current.cpds)
+                effects.cpds, effects.rns = self.fold_expand((current.folds | set(foldset)), current.cpds)
                 effects.rules = self.f.subset_from_rns(effects.rns)
 
                 n_new = len(getattr(effects, key_to_maximize)) - len(getattr(current, key_to_maximize))
@@ -385,7 +385,7 @@ class FoldMetabolism:
         result.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
         ## ITERATION 1 (using only seed folds and fold independent reactions)
-        current.cpds, current.rns = self.fold_expand3(current.folds, current.cpds)
+        current.cpds, current.rns = self.fold_expand(current.folds, current.cpds)
         result.update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
         ## Needed in case expansion not possible at all
@@ -394,7 +394,7 @@ class FoldMetabolism:
         ################################################
         ## ITERATION 2+
         while keep_going:
-            print("rule_order iteration (time in sec):{0} ({1})".format(result.iteration, result.iteration_time[result.iteration]))
+            print("rule iter: {} ({:.2} sec)".format(result.iteration, result.iteration_time[result.iteration]))
             size2foldsets = self.sort_remaining_foldsets_by_size(current.folds)
             next_foldset, effects = self.select_next_foldset(algorithm, size2foldsets, current)
 
