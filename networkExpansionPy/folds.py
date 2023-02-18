@@ -142,6 +142,7 @@ class Result:
         
         if self.temp_path == None:
             self.temp_path = str(path)
+            print("Temporary results written to:\n{}".format(self.temp_path))
 
     def final_write(self, path=None, str_to_append_to_fname=None):
         
@@ -157,6 +158,7 @@ class Result:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         self.final_path = str(path)
+        print("Final results written to:\n{}".format(self.final_path))
 
 class Rule:
 
@@ -413,7 +415,6 @@ class FoldMetabolism:
         ################################################
         ## ITERATION 2+
         while keep_going:
-            print("rule iter: {} ({:.2} sec)".format(result.iteration, result.iteration_time[result.iteration]))
             size2foldsets = self.sort_remaining_foldsets_by_size(current.folds)
             next_foldset, effects = self.select_next_foldset(algorithm, size2foldsets, current, debug=debug)
 
@@ -427,6 +428,7 @@ class FoldMetabolism:
                 current.rns = effects.rns
 
             ## Store when cpds and rns appear in the expansion
+            print("rule iter: {} ({:.2} sec) {}".format(result.iteration, result.iteration_time[result.iteration], next_foldset))
             result.update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
         if write:
