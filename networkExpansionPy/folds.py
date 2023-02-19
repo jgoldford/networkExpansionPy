@@ -227,7 +227,7 @@ class FoldRules:
         # return FoldRules([self.rn2rule[r] for r in rns])
 
     def subset_from_folds(self, folds):
-        return FoldRules([r for r in self.rules if r.foldset<=folds])
+        return FoldRules([r for r in self.rules if r.foldset <=folds])
         # return Rules([self.fs2rule[r] for r in rns])
 
     def remaining_rules(self, current_folds):
@@ -323,7 +323,7 @@ class FoldMetabolism:
         return self.sort_foldsets_by_size(remaining_foldsets)
 
     def sort_foldsets_by_size(self, foldsets):
-        rule_sizes = sorted(set([len(i) for i in foldsets]))
+        rule_sizes = sorted(set([len(i) for i in foldsets])) - set([0])
         ## Organizes rules by size
         size2foldsets = {size:list() for size in rule_sizes}
 
