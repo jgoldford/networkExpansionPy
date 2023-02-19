@@ -323,7 +323,7 @@ class FoldMetabolism:
         return self.sort_foldsets_by_size(remaining_foldsets)
 
     def sort_foldsets_by_size(self, foldsets):
-        rule_sizes = sorted(set([len(i) for i in foldsets])) - set([0])
+        rule_sizes = sorted(set([len(i) for i in foldsets]) - set([0]))
         ## Organizes rules by size
         size2foldsets = {size:list() for size in rule_sizes}
 
@@ -348,11 +348,16 @@ class FoldMetabolism:
 
                 effects.cpds, effects.rns = self.fold_expand((current.folds | set(foldset)), current.cpds)
                 effects.rules = self.f.subset_from_rns(effects.rns)
+
+                n_new = len(getattr(effects, key_to_maximize)) - len(getattr(current, key_to_maximize))
+
                 if debug:
                     print("foldset ",foldset)
                     print(effects.rules.ids)
-
-                n_new = len(getattr(effects, key_to_maximize)) - len(getattr(current, key_to_maximize))
+                    print("len_effects: ", len(getattr(effects, key_to_maximize)))
+                    print("len_current: ", len(getattr(current, key_to_maximize)))
+                    print("max_v: ", max_v)
+                    print("n_new: ", n_new)
 
                 if n_new == max_v:
                     max_effects[foldset] = effects
