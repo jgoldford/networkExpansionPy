@@ -393,7 +393,9 @@ class FoldMetabolism:
         ## It should always stop if we've found all scope cpds, rns
         ## actually it might be possible to discover all reactions and compounds but not all rules
         ## but if we've discovered all folds then we've discovered all rules
-        if (current.cpds == self.scope.cpds) and (current.rns == self.scope.rns) and (current.folds == self.scope.folds):
+        if ((set(self.scope.cpds).issubset(set(current.cpds))) and 
+            (set(self.scope.rns).issubset(set(current.rns))) and 
+            (set(self.scope.folds).issubset(set(current.folds)))):
             print("Reached scope compounds, reactions, and folds.")
             return False
 
