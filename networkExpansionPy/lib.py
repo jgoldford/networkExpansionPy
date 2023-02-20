@@ -27,6 +27,22 @@ def netExp(R,P,x,b):
         k = np.sum(x);
     return x,y
 
+# single step of network expansion
+def netExp_step(R,P,x,b):
+    k = np.sum(x);
+    k0 = 0;
+    n_reactions = np.size(R,1)
+    y = csr_matrix(np.zeros(n_reactions))
+
+    k0 = np.sum(x);
+    y = (np.dot(R.transpose(),x) == b);
+    y = y.astype('int');
+    x_n = np.dot(P,y) + x;
+    x_n = x_n.astype('bool');
+    x = x_n.astype('int');
+    k = np.sum(x);
+    return x,y
+
 # define a new network expansion, s.t. stopping criteria is now no new compounds or reactions can be added at subsequent iterations
 def netExp_cr(R,P,x,b):
     k = np.sum(x);
@@ -515,6 +531,8 @@ class GlobalMetabolicNetwork:
             x,y = netExp_cr(R,P,x0,b)
         elif algorithm.lower() == 'trace':
             X,Y = netExp_trace(R,P,x0,b)
+        elif algorithm.lower() == 'step':
+            x,y = netExp_step(R,P,x0,b)
         else:
             raise ValueError('algorithm needs to be naive (compound stopping criteria) or cr (reaction/compound stopping criteria)')
         
