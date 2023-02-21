@@ -72,7 +72,7 @@ class Result:
         self.cpds = dict()
         self.rns = dict()
         self.folds = {"fold_independent":0}
-        self.rules = dict()
+        self.rules = dict() # activated; not simply possible
         self.start_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.start_time = timeit.default_timer()
         self.iteration_time = dict()
@@ -328,8 +328,8 @@ class FoldMetabolism:
         return set(cx), set([i[0] for i in rx])
 
     def sort_remaining_foldsets_by_size(self, current_folds):#, remaining_rules):
-
-        remaining_rules = self.scope.rules.remaining_rules(current_folds)
+        ## remove current.folds from all foldsets, and return those foldsets
+        remaining_rules = self.scope.rules.remaining_rules(current_folds) # the already found rules aren't necessarily activated
         remaining_foldsets = set([i-current_folds for i in remaining_rules.foldsets]) ## excludes folds already discovered
         return self.sort_foldsets_by_size(remaining_foldsets)
 
@@ -359,8 +359,9 @@ class FoldMetabolism:
 
                 effects = Params()
 
-                effects.cpds, effects.rns = self.fold_expand((current.folds | set(foldset)), current.cpds)
-                effects.rules = self.f.subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
+                effects.folds = current.folds | set(foldset)
+                effects.cpds, effects.rns = self.fold_expand(effects.folds, current.cpds)
+                effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
 
                 n_new = len(getattr(effects, key_to_maximize)) - len(getattr(current, key_to_maximize))
                 n_new_set = len(set(getattr(effects, key_to_maximize)) - set(getattr(current, key_to_maximize)))
@@ -433,7 +434,7 @@ class FoldMetabolism:
         ## Place to store results and current state of expansion
         ## ITERATION 0 (Avoid updating folds on the 0th iteration since they don't apply until iteration=1)
         result = Result()
-        current = Params(folds=self.seed.folds, cpds=self.seed.cpds, rns=self.seed.rns, rules=self.scope.rules.subset_from_folds(self.seed.folds))
+        current = Params(folds=self.seed.folds, cpds=self.seed.cpds, rns=self.seed.rns, rules=self.scope.rules.subset_from_folds(self.seed.folds).subset_from_rns(self.seed.rns))
         result.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
         ## ITERATION 1 (using only seed folds and fold independent reactions)
@@ -454,9 +455,10 @@ class FoldMetabolism:
             if keep_going:
                 ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
                 current.folds = (current.folds | set(next_foldset))
-                current.rules = self.scope.rules.subset_from_folds(current.folds)
                 current.cpds = effects.cpds
                 current.rns = effects.rns
+                current.rules = self.scope.rules.subset_from_folds(current.folds).subset_from_rns(current.rns)
+                
 
             ## Store when cpds and rns appear in the expansion
             result.update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
