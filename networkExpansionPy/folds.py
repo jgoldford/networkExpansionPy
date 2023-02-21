@@ -62,6 +62,11 @@ class Params(ImmutableParams):
     def rules(self, value):
         self._rules = deepcopy(value)
 
+class Metadata:
+    def __init__(self):
+        self.size2foldsets = None
+        self.max_effects = None
+
 class Result:
     """
     Store data from the run
@@ -79,17 +84,23 @@ class Result:
         self.final_path = None
         self.temp_path = None
 
-    def first_update(self, current, write=False, path=None, str_to_append_to_fname=None):
+        self.max_effects = dict()
+        self.size2foldsets = dict()
+
+    def first_update(self, current, metadata=None, write=False, path=None, str_to_append_to_fname=None):
         self.update_cpds(current)
         self.update_rns(current)
         self.update_iteration_time()
         if write==True:
             self.temp_write(path=path, str_to_append_to_fname=str_to_append_to_fname)
 
-    def update(self, current, write=False, path=None, str_to_append_to_fname=None):
+    def update(self, current, metadata=None, write=False, path=None, str_to_append_to_fname=None):
         self.update_iter()
         self.update_folds(current)
         self.update_rules(current)
+        if metadata != None:
+            self.update_max_effects(metadata)
+            self.update_size2foldsets(metadata)
         self.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
     def update_cpds(self, current):
@@ -114,6 +125,12 @@ class Result:
 
     def update_iteration_time(self):
         self.iteration_time[self.iteration] =  timeit.default_timer() - self.start_time
+
+    def update_max_effects(self, metadata):
+        self.max_effects[self.iteration] = metadata.max_effects
+
+    def update_size2foldsets(self, metadata):
+        self.size2foldsets[self.iteration] = metadata.size2foldsets
 
     def update_iter(self):
         self.iteration+=1
@@ -377,11 +394,8 @@ class FoldMetabolism:
                     print("rn_current - rn_effects: ", set(current.rns) - set(effects.rns))
                     print("cpd_current - cpd_effects: ", set(current.cpds) - set(effects.cpds))
                     print("max_v: ", max_v)
+                    print("max_v foldsets: ", max_effects.keys())
                     print("n_new / n_new_set: ", n_new, n_new_set)
-                    print("frozenset({'246'}) in current: ", ('246' in current.folds))
-                    print("frozenset({'246'}) in effects: ", ('246' in effects.rules.folds))
-                    print("'R01267' in current: ", ('R01267' in current.rns))
-                    print("'R01267' in effects: ", ('R01267' in effects.rns))
                     print("~"*40)
 
                 if n_new == max_v:
@@ -396,8 +410,6 @@ class FoldMetabolism:
             ## Don't look for longer rules if shorter rules enable new reactions
             if len(max_effects)>0:
                 break
-        if debug:
-            pprint(max_effects)
         return max_effects
 
     def select_next_foldset(self, algorithm, size2foldsets, current, debug=False, ordered_outcome=False):
@@ -414,7 +426,7 @@ class FoldMetabolism:
                     next_foldset = frozenset(foldset_tuples[0])
                 else:
                     next_foldset = frozenset(random.choice(foldset_tuples)) ## change back to frozenset
-            return next_foldset, max_effects[next_foldset]
+            return next_foldset, max_effects #[next_foldset]
 
     def keep_going(self, current):
 
@@ -438,6 +450,7 @@ class FoldMetabolism:
         ## ITERATION 0 (Avoid updating folds on the 0th iteration since they don't apply until iteration=1)
         result = Result()
         current = Params(folds=self.seed.folds, cpds=self.seed.cpds, rns=self.seed.rns, rules=self.scope.rules.subset_from_folds(self.seed.folds).subset_from_rns(self.seed.rns))
+        metadata = Metadata()
         result.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
         ## ITERATION 1 (using only seed folds and fold independent reactions)
@@ -451,7 +464,8 @@ class FoldMetabolism:
         ## ITERATION 2+
         while keep_going:
             size2foldsets = self.sort_remaining_foldsets_by_size(current.folds)
-            next_foldset, effects = self.select_next_foldset(algorithm, size2foldsets, current, debug=debug, ordered_outcome=ordered_outcome)
+            next_foldset, max_effects = self.select_next_foldset(algorithm, size2foldsets, current, debug=debug, ordered_outcome=ordered_outcome)
+            effects = max_effects[next_foldset]
 
             keep_going = self.keep_going(current)
 
@@ -461,13 +475,15 @@ class FoldMetabolism:
                 current.cpds = effects.cpds
                 current.rns = effects.rns
                 current.rules = self.scope.rules.subset_from_folds(current.folds).subset_from_rns(current.rns)
+                metadata.max_effects = max_effects
+                metadata.size2foldsets = size2foldsets
                 
 
             ## Store when cpds and rns appear in the expansion
-            result.update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
+            result.update(current, metadata=metadata, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
             print("="*60)
             print("rule iter: {} ({:.2} sec) {}".format(result.iteration, result.iteration_time[result.iteration], next_foldset))
-
+            print("="*60)
 
         if write:
             result.final_write(path=path, str_to_append_to_fname=str_to_append_to_fname)
