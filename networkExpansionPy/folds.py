@@ -461,6 +461,7 @@ class FoldMetabolism:
 
         ## ITERATION 1 (using only seed folds and fold independent reactions)
         current.cpds, current.rns = self.fold_expand(current.folds, current.cpds)
+        current.rules = self.scope.rules.subset_from_folds(current.folds).subset_from_rns(current.rns)
         result.update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
         ## Needed in case expansion not possible at all
