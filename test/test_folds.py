@@ -366,6 +366,9 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         self.assertEqual(final_result.folds, temp_result.folds)
         self.assertEqual(final_result.rules, temp_result.rules)
 
+#### Tests to add
+# - test ordering of rules when there's an overlap with seed folds
+
 #########################################################################
 ## Below tests not updated recently
 
