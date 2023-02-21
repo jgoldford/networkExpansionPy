@@ -328,7 +328,7 @@ class FoldMetabolism:
         print("...done.")
         return ImmutableParams(folds=scope.folds, rns=scope.rns, rules=scope.rules, cpds=scope.cpds)
 
-    def fold_expand(self, folds, current_cpds):
+    def fold_expand(self, folds, current_cpds, fold_algorithm="naive"):
         """
         Returns a set of compounds and set of reactions enabled by expansion 
         using `current_cpds` and the reactions enabled by `folds` and fold independent 
@@ -341,7 +341,7 @@ class FoldMetabolism:
 
         possible_rules = self.f.subset_from_folds(folds)
         rn_tup_set = set(self.m.rxns2tuple(possible_rules.rns | self.seed.rns))
-        cx,rx = self.m.expand(current_cpds | self.seed.cpds, reaction_mask=rn_tup_set)
+        cx,rx = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, reaction_mask=rn_tup_set)
         return set(cx), set([i[0] for i in rx])
 
     def sort_remaining_foldsets_by_size(self, current_folds):#, remaining_rules):
@@ -360,6 +360,69 @@ class FoldMetabolism:
             size2foldsets[len(fs)].append(frozenset(fs)) ## change back to frozenset
 
         return size2foldsets
+
+    def present_loop_through_remaining_foldsets(self, size2foldsets, current, key_to_maximize, debug=False):
+
+         ## key_to_maximize is one of "rns", "cpds", "rules"
+        if key_to_maximize=="folds":
+            raise(ValueError("It doesn't make sense to choose a fold which maximizes number of folds."))
+
+        # max_effects = dict()
+        # max_v = 0
+
+        one_step_effects = Params()
+        one_step_effects.cpds, one_step_effects.rns = self.fold_expand(self.scope.folds, current.cpds, fold_algorithm="step")
+
+        finished = False
+        for size in sorted(size2foldsets.keys()):
+
+            sized_foldsets = size2foldsets[size]
+
+            ## Narrow down based on reactions which can happen in current network
+            rule_options = self.scope.rules.subset_from_rns(one_step_effects.rns)
+        
+            ## only include rules that are in foldsets
+            rule_options = FoldRules([r for r in rule_options if r.foldset in sized_foldsets])
+
+            if len(rule_options) == 0:
+                continue
+
+            ## out of all size=size folds, which correspond to the most 1. rule or 2. rn or 3. cpd
+            foldset2rule = {k:list() for k in rule_options.foldsets}
+            for r in rule_options:
+                foldset2rule[r.foldset].append(r)
+
+            foldset2rule_count = {k:len(v) for k, v in foldset2rule.items()}
+
+
+            max_v = max(foldset2rule_count.values())
+
+            max_foldsets = [k for k, v in foldset2rule_count.items() if v==max_v]
+
+            if len(max_foldsets)>0:
+                finished = True
+                break
+        
+        ## Choose next foldset
+        if finished:
+            foldset_tuples = sorted([sorted(tuple(i)) for i in max_foldsets]) ## cast as tuples for predictable sorting
+            if ordered_outcome:
+                next_foldset = frozenset(foldset_tuples[0])
+            else:
+                next_foldset = frozenset(random.choice(foldset_tuples)) ## change back to frozenset
+
+            ## Do expansion
+            effects = Params()
+            effects.folds = current.folds | set(next_foldset)
+            effects.cpds, effects.rns = self.fold_expand(effects.folds, current.cpds)
+            effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
+            
+            return next_foldset, {next_foldset:effects} ## to mimic the structure of max_effects
+
+        else:
+            print("No foldsets remaining.")
+            return frozenset(), {frozenset():deepcopy(current)}
+
 
     def loop_through_remaining_foldsets(self, size2foldsets, current, key_to_maximize, debug=False):
         ## key_to_maximize is one of "rns", "cpds", "rules"
@@ -433,6 +496,9 @@ class FoldMetabolism:
                 else:
                     next_foldset = frozenset(random.choice(foldset_tuples)) ## change back to frozenset
             return next_foldset, max_effects #[next_foldset]
+
+        else:
+            raise(ValueError("algorithm not found."))
 
     def keep_going(self, current):
 
