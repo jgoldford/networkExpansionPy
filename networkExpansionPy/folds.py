@@ -82,12 +82,12 @@ class Result:
     def first_update(self, current, write=False, path=None, str_to_append_to_fname=None):
         self.update_cpds(current)
         self.update_rns(current)
-        self.update_iter()
         self.update_iteration_time()
         if write==True:
             self.temp_write(path=path, str_to_append_to_fname=str_to_append_to_fname)
 
     def update(self, current, write=False, path=None, str_to_append_to_fname=None):
+        self.update_iter()
         self.update_folds(current)
         self.update_rules(current)
         self.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
@@ -162,10 +162,18 @@ class Result:
 
 class Rule:
 
-    def __init__(self,rn,foldset):
+    def __init__(self,rn,foldset:frozenset):
         self.rn = rn
         self.foldset = foldset
         self.id = (rn, foldset)
+
+    def __hash__(self):
+        return hash(self.id)
+
+    def __eq__(self, other):
+        if isinstance(other, Rule):
+            return self.id == other.id
+        return False
 
     def __repr__(self):
         return "id:\t\t{0} \nrn:\t\t{1} \nfoldset:\t{2}".format(self.id, self.rn, self.foldset)
@@ -239,6 +247,9 @@ class FoldRules:
     def __len__(self):
         return len(self.ids)
 
+    def __iter__(self):
+        return iter(self.rules)
+
 class FoldMetabolism:
     """
     A class to do fold expansion from a metabolism, foldrules, and seeds.
@@ -311,8 +322,8 @@ class FoldMetabolism:
         :return: set of compounds and set of reactions from the expansion
         """
 
-        active_rules = self.f.subset_from_folds(folds)
-        rn_tup_set = set(self.m.rxns2tuple(active_rules.rns | self.seed.rns))
+        possible_rules = self.f.subset_from_folds(folds)
+        rn_tup_set = set(self.m.rxns2tuple(possible_rules.rns | self.seed.rns))
         cx,rx = self.m.expand(current_cpds | self.seed.cpds, reaction_mask=rn_tup_set)
         return set(cx), set([i[0] for i in rx])
 
@@ -349,17 +360,28 @@ class FoldMetabolism:
                 effects = Params()
 
                 effects.cpds, effects.rns = self.fold_expand((current.folds | set(foldset)), current.cpds)
-                effects.rules = self.f.subset_from_rns(effects.rns)
+                effects.rules = self.f.subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
 
                 n_new = len(getattr(effects, key_to_maximize)) - len(getattr(current, key_to_maximize))
+                n_new_set = len(set(getattr(effects, key_to_maximize)) - set(getattr(current, key_to_maximize)))
 
                 if debug:
                     print("size: ", size)
                     print("foldset: ", foldset)
-                    print("len_effects: ", len(getattr(effects, key_to_maximize)))
-                    print("len_current: ", len(getattr(current, key_to_maximize)))
+                    print("len_effects / len_current: ", len(getattr(effects, key_to_maximize)),  len(getattr(current, key_to_maximize)))
+                    print("set_effects / set_current: ", len(set(getattr(effects, key_to_maximize))),  len(set(getattr(current, key_to_maximize))))
+                    print("set_effects - set_current: ", [i.id for i in set(getattr(effects, key_to_maximize)) - set(getattr(current, key_to_maximize))])
+                    print("set_current - set_effects: ", [i.id for i in set(getattr(current, key_to_maximize)) - set(getattr(effects, key_to_maximize))])
+                    print("fold_current - fold_effects: ", set(current.folds) - set(effects.rules.folds))
+                    print("rn_current - rn_effects: ", set(current.rns) - set(effects.rns))
+                    print("cpd_current - cpd_effects: ", set(current.cpds) - set(effects.cpds))
                     print("max_v: ", max_v)
-                    print("n_new: ", n_new)
+                    print("n_new / n_new_set: ", n_new, n_new_set)
+                    print("frozenset({'246'}) in current: ", ('246' in current.folds))
+                    print("frozenset({'246'}) in effects: ", ('246' in effects.rules.folds))
+                    print("'R01267' in current: ", ('R01267' in current.rns))
+                    print("'R01267' in effects: ", ('R01267' in effects.rns))
+                    print("~"*40)
 
                 if n_new == max_v:
                     max_effects[foldset] = effects
@@ -437,8 +459,10 @@ class FoldMetabolism:
                 current.rns = effects.rns
 
             ## Store when cpds and rns appear in the expansion
-            print("rule iter: {} ({:.2} sec) {}".format(result.iteration, result.iteration_time[result.iteration], next_foldset))
             result.update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
+            print("="*60)
+            print("rule iter: {} ({:.2} sec) {}".format(result.iteration, result.iteration_time[result.iteration], next_foldset))
+
 
         if write:
             result.final_write(path=path, str_to_append_to_fname=str_to_append_to_fname)
