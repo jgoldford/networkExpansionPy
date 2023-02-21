@@ -163,7 +163,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         fm = nf.FoldMetabolism(self.met, foldrules, seed)
         current = nf.Params(folds=fm.seed.folds, cpds=fm.seed.cpds, rns=fm.seed.rns, rules=fm.scope.rules.subset_from_folds(fm.seed.folds))
         size2foldsets = fm.sort_remaining_foldsets_by_size(current.folds)
-        algorithm = "max_rules"
+        algorithm = "look_ahead_rules"
 
         next_foldset, effects = fm.select_next_foldset(algorithm, size2foldsets, current)
         self.assertEqual(next_foldset, frozenset({'F0'}))
@@ -178,7 +178,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         )
 
         fm = nf.FoldMetabolism(self.met, foldrules, seed)
-        result = fm.rule_order(algorithm="max_rules")
+        result = fm.rule_order(algorithm="look_ahead_rules")
 
         expected_cpds = {'C0': 0,
                         'C1': 2,
@@ -240,7 +240,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         )
 
         fm = nf.FoldMetabolism(self.met, foldrules, seed)
-        result = fm.rule_order(algorithm="max_rules", debug=False, ordered_outcome=True)
+        result = fm.rule_order(algorithm="look_ahead_rules", debug=False, ordered_outcome=True)
 
         expected_cpds = {'C0': 0,
                         'C1': 1,
@@ -305,7 +305,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         )
 
         fm = nf.FoldMetabolism(self.met, foldrules, seed)
-        result = fm.rule_order(algorithm="max_rules", write=True, ordered_outcome=True)
+        result = fm.rule_order(algorithm="look_ahead_rules", write=True, ordered_outcome=True)
 
         expected_cpds = {'C0': 0,
                         'C1': 1,

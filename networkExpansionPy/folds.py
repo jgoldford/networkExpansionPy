@@ -413,9 +413,15 @@ class FoldMetabolism:
         return max_effects
 
     def select_next_foldset(self, algorithm, size2foldsets, current, debug=False, ordered_outcome=False):
+
+        look_ahead_algorithms = {
+            "look_ahead_rules":"rules",
+            "look_ahead_rns":"rns",
+            "look_ahead_cpds":"cpds",
+        }
         
-        if algorithm == "max_rules":
-            max_effects = self.loop_through_remaining_foldsets(size2foldsets, current, "rules", debug=debug)
+        if algorithm in look_ahead_algorithms:
+            max_effects = self.loop_through_remaining_foldsets(size2foldsets, current, look_ahead_algorithms[algorithm], debug=debug)
             if len(max_effects) == 0:
                 next_foldset = frozenset()
                 max_effects[next_foldset] = deepcopy(current)
