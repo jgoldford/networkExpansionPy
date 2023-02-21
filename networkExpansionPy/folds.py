@@ -400,7 +400,7 @@ class FoldMetabolism:
             pprint(max_effects)
         return max_effects
 
-    def select_next_foldset(self, algorithm, size2foldsets, current, debug=False):
+    def select_next_foldset(self, algorithm, size2foldsets, current, debug=False, ordered_outcome=False):
         
         if algorithm == "max_rules":
             max_effects = self.loop_through_remaining_foldsets(size2foldsets, current, "rules", debug=debug)
@@ -410,7 +410,10 @@ class FoldMetabolism:
                 print("No foldsets remaining.")
             else:
                 foldset_tuples = sorted([sorted(tuple(i)) for i in max_effects.keys()]) ## cast as tuples for predictable sorting
-                next_foldset = frozenset(random.choice(foldset_tuples)) ## change back to frozenset
+                if ordered_outcome:
+                    next_foldset = frozenset(foldset_tuples[0])
+                else:
+                    next_foldset = frozenset(random.choice(foldset_tuples)) ## change back to frozenset
             return next_foldset, max_effects[next_foldset]
 
     def keep_going(self, current):
@@ -427,7 +430,7 @@ class FoldMetabolism:
         else:
             return True
 
-    def rule_order(self, algorithm="max_rules", write=False, path=None, str_to_append_to_fname=None, debug=False):
+    def rule_order(self, algorithm="max_rules", write=False, path=None, str_to_append_to_fname=None, debug=False, ordered_outcome=False):
         """
         Determine the ordering of all rules/folds.
         """
@@ -448,7 +451,7 @@ class FoldMetabolism:
         ## ITERATION 2+
         while keep_going:
             size2foldsets = self.sort_remaining_foldsets_by_size(current.folds)
-            next_foldset, effects = self.select_next_foldset(algorithm, size2foldsets, current, debug=debug)
+            next_foldset, effects = self.select_next_foldset(algorithm, size2foldsets, current, debug=debug, ordered_outcome=ordered_outcome)
 
             keep_going = self.keep_going(current)
 
