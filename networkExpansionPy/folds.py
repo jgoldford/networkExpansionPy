@@ -361,7 +361,7 @@ class FoldMetabolism:
 
         return size2foldsets
 
-    def present_loop_through_remaining_foldsets(self, size2foldsets, current, key_to_maximize, debug=False):
+    def no_look_ahead_loop_through_remaining_foldsets(self, size2foldsets, current, key_to_maximize, debug=False, ordered_outcome=False):
 
          ## key_to_maximize is one of "rns", "cpds", "rules"
         if key_to_maximize=="folds":
@@ -482,6 +482,10 @@ class FoldMetabolism:
             "look_ahead_rns":"rns",
             "look_ahead_cpds":"cpds",
         }
+
+        no_look_ahead_algorithms = {
+            "no_look_ahead_rules":"rules"
+        }
         
         if algorithm in look_ahead_algorithms:
             max_effects = self.loop_through_remaining_foldsets(size2foldsets, current, look_ahead_algorithms[algorithm], debug=debug)
@@ -496,6 +500,10 @@ class FoldMetabolism:
                 else:
                     next_foldset = frozenset(random.choice(foldset_tuples)) ## change back to frozenset
             return next_foldset, max_effects #[next_foldset]
+
+        elif algorithm in no_look_ahead_algorithms:
+            next_foldset, max_effects = self.no_look_ahead_loop_through_remaining_foldsets(size2foldsets, current, no_look_ahead_algorithms[algorithm], debug=debug, ordered_outcome=ordered_outcome)
+            return next_foldset, max_effects
 
         else:
             raise(ValueError("algorithm not found."))
