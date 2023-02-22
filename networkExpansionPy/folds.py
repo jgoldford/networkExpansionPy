@@ -384,18 +384,25 @@ class FoldMetabolism:
 
             sized_foldsets = size2foldsets[size]
 
-            ## Narrow down based on reactions which can happen in current network
-            rule_options = self.scope.rules.subset_from_rns(one_step_effects.rns).subset_from_foldsets(sized_foldsets)
+            possible_rules = self.scope.rules.remaining_rules(current.folds).subset_from_rns(one_step_effects.rns)
 
-            if len(rule_options) == 0:
-                continue
+            foldset2rules_count = dict()
+            for foldset in sized_foldsets:
+                foldset2rules_count[foldset] = len(possible_rules.subset_from_folds(current.folds | foldset))
+            
 
-            ## out of all size=size folds, which correspond to the most 1. rule or 2. rn or 3. cpd
-            foldset2rules = rule_options.foldset2rules()
-            foldset2rules_count = {k:len(v) for k, v in foldset2rules.items()}
+            # ## Narrow down based on reactions which can happen in current network
+            # rule_options = self.scope.rules.subset_from_rns(one_step_effects.rns).subset_from_foldsets(sized_foldsets)
+
+            # if len(rule_options) == 0:
+            #     continue
+
+            # ## out of all size=size folds, which correspond to the most rules
+            # foldset2rules = rule_options.foldset2rules()
+            # foldset2rules_count = {k:len(v) for k, v in foldset2rules.items()}
 
             max_v = max(foldset2rules_count.values()) # should always be > 0 due to len(rule_options) check above
-            max_foldsets = [k for k, v in foldset2rule_count.items() if v==max_v]
+            max_foldsets = [k for k, v in foldset2rules_count.items() if v==max_v]
 
             if len(max_foldsets)>0:
                 finished = True
