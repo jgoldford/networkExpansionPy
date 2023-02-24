@@ -255,8 +255,8 @@ class FoldRules:
         return FoldRules([r for r in self.rules if r.foldset <=folds])
         # return Rules([self.fs2rule[r] for r in rns])
 
-    def subset_from_foldsets(self, foldsets):
-        return FoldRules([r for r in self.rules if r.foldset in foldsets])
+    # def subset_from_foldsets(self, foldsets):
+    #     return FoldRules([r for r in self.rules if r.foldset in foldsets])
 
     def remaining_rules(self, current_folds):
         return FoldRules([r for r in self.rules if len(r.foldset-current_folds)>0])
@@ -390,17 +390,6 @@ class FoldMetabolism:
             for foldset in sized_foldsets:
                 foldset2rules_count[foldset] = len(possible_rules.subset_from_folds(current.folds | foldset))
             
-
-            # ## Narrow down based on reactions which can happen in current network
-            # rule_options = self.scope.rules.subset_from_rns(one_step_effects.rns).subset_from_foldsets(sized_foldsets)
-
-            # if len(rule_options) == 0:
-            #     continue
-
-            # ## out of all size=size folds, which correspond to the most rules
-            # foldset2rules = rule_options.foldset2rules()
-            # foldset2rules_count = {k:len(v) for k, v in foldset2rules.items()}
-
             max_v = max(foldset2rules_count.values()) # should always be > 0 due to len(rule_options) check above
             max_foldsets = [k for k, v in foldset2rules_count.items() if v==max_v]
 
@@ -429,7 +418,7 @@ class FoldMetabolism:
             return frozenset(), {frozenset():deepcopy(current)}
 
 
-    def loop_through_remaining_foldsets(self, size2foldsets, current, key_to_maximize, debug=False):
+    def look_ahead_loop_through_remaining_foldsets(self, size2foldsets, current, key_to_maximize, debug=False):
         ## key_to_maximize is one of "rns", "cpds", "rules"
         if key_to_maximize=="folds":
             raise(ValueError("It doesn't make sense to choose a fold which maximizes number of folds."))
@@ -493,7 +482,7 @@ class FoldMetabolism:
         }
         
         if algorithm in look_ahead_algorithms:
-            max_effects = self.loop_through_remaining_foldsets(size2foldsets, current, look_ahead_algorithms[algorithm], debug=debug)
+            max_effects = self.look_ahead_loop_through_remaining_foldsets(size2foldsets, current, look_ahead_algorithms[algorithm], debug=debug)
             if len(max_effects) == 0:
                 next_foldset = frozenset()
                 max_effects[next_foldset] = deepcopy(current)
