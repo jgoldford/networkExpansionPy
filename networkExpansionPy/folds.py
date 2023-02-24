@@ -1,9 +1,8 @@
-import pandas as pd
+import pandas as pd # only used in example main
 from pathlib import PurePath, Path
-from copy import copy, deepcopy
+from copy import deepcopy
 import timeit
 from pprint import pprint
-from collections import Counter
 from datetime import datetime
 import random
 import pickle
