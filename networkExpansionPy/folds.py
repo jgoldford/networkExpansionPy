@@ -386,9 +386,10 @@ class FoldMetabolism:
 
             possible_rules = self.scope.rules.remaining_rules(current.folds).subset_from_rns(one_step_effects.rns)
 
-            foldset2rules_count = dict()
+            foldset2key_count = dict() ## key_to_maximize
             for foldset in sized_foldsets:
-                foldset2rules_count[foldset] = len(possible_rules.subset_from_folds(current.folds | foldset))
+                _new_rules = possible_rules.subset_from_folds(current.folds | foldset)
+                foldset2key_count[foldset] = len(getattr(_new_rules, key_to_maximize))
             
             max_v = max(foldset2rules_count.values()) # should always be > 0 due to len(rule_options) check above
             max_foldsets = [k for k, v in foldset2rules_count.items() if v==max_v]
@@ -478,7 +479,8 @@ class FoldMetabolism:
         }
 
         no_look_ahead_algorithms = {
-            "no_look_ahead_rules":"rules"
+            "no_look_ahead_rules":"rules",
+            "no_look_ahead_rules":"rns"
         }
         
         if algorithm in look_ahead_algorithms:
