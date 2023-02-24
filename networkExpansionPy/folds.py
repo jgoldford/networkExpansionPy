@@ -502,19 +502,19 @@ class FoldMetabolism:
         else:
             raise(ValueError("algorithm not found."))
 
-    def keep_going(self, current):
+    # def keep_going(self, current):
 
-        ## It should always stop if we've found all scope cpds, rns
-        ## actually it might be possible to discover all reactions and compounds but not all rules
-        ## but if we've discovered all folds then we've discovered all rules
-        if ((set(self.scope.cpds).issubset(set(current.cpds))) and 
-            (set(self.scope.rns).issubset(set(current.rns))) and 
-            (set(self.scope.folds).issubset(set(current.folds)))):
-            print("Reached scope compounds, reactions, and folds.")
-            return False
+    #     ## It should always stop if we've found all scope cpds, rns
+    #     ## actually it might be possible to discover all reactions and compounds but not all rules
+    #     ## but if we've discovered all folds then we've discovered all rules
+    #     if ((set(self.scope.cpds).issubset(set(current.cpds))) and 
+    #         (set(self.scope.rns).issubset(set(current.rns))) and 
+    #         (set(self.scope.folds).issubset(set(current.folds)))):
+    #         print("Reached scope compounds, reactions, and folds.")
+    #         return False
 
-        else:
-            return True
+    #     else:
+    #         return True
 
     def rule_order(self, algorithm="max_rules", write=False, path=None, str_to_append_to_fname=None, debug=False, ordered_outcome=False):
         """
@@ -542,7 +542,6 @@ class FoldMetabolism:
             next_foldset, max_effects = self.select_next_foldset(algorithm, size2foldsets, current, debug=debug, ordered_outcome=ordered_outcome)
             effects = max_effects[next_foldset]
 
-            keep_going = self.keep_going(current)
             if len(next_foldset)==0:
                 keep_going = False 
 
