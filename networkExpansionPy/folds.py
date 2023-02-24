@@ -370,7 +370,7 @@ class FoldMetabolism:
 
         return size2foldsets
 
-    def no_look_ahead_loop_through_remaining_foldsets(self, size2foldsets, current, key_to_maximize, debug=False, ordered_outcome=False):
+    def loop_through_remaining_foldsets_no_look_ahead(self, size2foldsets, current, key_to_maximize, debug=False, ordered_outcome=False):
 
          ## key_to_maximize is one of "rns", "cpds", "rules"
         if key_to_maximize=="folds":
@@ -382,44 +382,22 @@ class FoldMetabolism:
         finished = False
         for size in sorted(size2foldsets.keys()):
 
-            sized_foldsets = size2foldsets[size]
-
-            possible_rules = self.scope.rules.remaining_rules(current.folds).subset_from_rns(one_step_effects.rns)
+            possible_next_rules = self.scope.rules.remaining_rules(current.folds).subset_from_rns(one_step_effects.rns)
 
             foldset2key_count = dict() ## key_to_maximize
-            for foldset in sized_foldsets:
-                _new_rules = possible_rules.subset_from_folds(current.folds | foldset)
-                foldset2key_count[foldset] = len(getattr(_new_rules, key_to_maximize))
+            for foldset in size2foldsets[size]:
+                _foldset_rules = possible_next_rules.subset_from_folds(current.folds | foldset)
+                foldset2key_count[foldset] = len(getattr(_foldset_rules, key_to_maximize))
             
-            max_v = max(foldset2rules_count.values()) # should always be > 0 due to len(rule_options) check above
-            max_foldsets = [k for k, v in foldset2rules_count.items() if v==max_v]
+            max_v = max(foldset2key_count.values()) # should always be > 0 due to len(rule_options) check above
+            max_foldsets = [k for k, v in foldset2key_count.items() if v==max_v]
 
             if len(max_foldsets)>0:
-                finished = True
                 break
         
-        ## Choose next foldset
-        if finished:
-            foldset_tuples = sorted([sorted(tuple(i)) for i in max_foldsets]) ## cast as tuples for predictable sorting
-            if ordered_outcome:
-                next_foldset = frozenset(foldset_tuples[0])
-            else:
-                next_foldset = frozenset(random.choice(foldset_tuples)) ## change back to frozenset
+        return max_foldsets
 
-            ## Do expansion
-            effects = Params()
-            effects.folds = current.folds | set(next_foldset)
-            effects.cpds, effects.rns = self.fold_expand(effects.folds, current.cpds)
-            effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
-            
-            return next_foldset, {next_foldset:effects} ## to mimic the structure of max_effects
-
-        else:
-            print("No foldsets remaining.")
-            return frozenset(), {frozenset():deepcopy(current)}
-
-
-    def look_ahead_loop_through_remaining_foldsets(self, size2foldsets, current, key_to_maximize, debug=False):
+    def loop_through_remaining_foldsets_look_ahead(self, size2foldsets, current, key_to_maximize, debug=False):
         ## key_to_maximize is one of "rns", "cpds", "rules"
         if key_to_maximize=="folds":
             raise(ValueError("It doesn't make sense to choose a fold which maximizes number of folds."))
@@ -470,7 +448,40 @@ class FoldMetabolism:
                 break
         return max_effects
 
-    def select_next_foldset(self, algorithm, size2foldsets, current, debug=False, ordered_outcome=False):
+    def choose_next_foldset_no_look_ahead(self, current, max_foldsets, ordered_outcome):
+        if len(max_foldsets)>0:
+            foldset_tuples = sorted([sorted(tuple(i)) for i in max_foldsets]) ## cast as tuples for predictable sorting
+            if ordered_outcome:
+                next_foldset = frozenset(foldset_tuples[0])
+            else:
+                next_foldset = frozenset(random.choice(foldset_tuples)) ## change back to frozenset
+
+            ## Do expansion
+            effects = Params()
+            effects.folds = current.folds | set(next_foldset)
+            effects.cpds, effects.rns = self.fold_expand(effects.folds, current.cpds)
+            effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
+            
+            return next_foldset, {next_foldset:effects} ## to mimic the structure of max_effects
+
+        else:
+            print("No foldsets remaining.")
+            return frozenset(), {frozenset():deepcopy(current)}
+
+    def choose_next_foldset_look_ahead(self, current, max_effects, ordered_outcome):
+        if len(max_effects) == 0:
+                next_foldset = frozenset()
+                max_effects[next_foldset] = deepcopy(current)
+                print("No foldsets remaining.")
+        else:
+            foldset_tuples = sorted([sorted(tuple(i)) for i in max_effects.keys()]) ## cast as tuples for predictable sorting
+            if ordered_outcome:
+                next_foldset = frozenset(foldset_tuples[0])
+            else:
+                next_foldset = frozenset(random.choice(foldset_tuples)) ## change back to frozenset
+        return next_foldset, max_effects #[next_foldset]
+
+    def choose_next_foldset(self, algorithm, size2foldsets, current, debug=False, ordered_outcome=False):
 
         look_ahead_algorithms = {
             "look_ahead_rules":"rules",
@@ -480,45 +491,47 @@ class FoldMetabolism:
 
         no_look_ahead_algorithms = {
             "no_look_ahead_rules":"rules",
-            "no_look_ahead_rules":"rns"
+            "no_look_ahead_rns":"rns"
         }
         
         if algorithm in look_ahead_algorithms:
-            max_effects = self.look_ahead_loop_through_remaining_foldsets(size2foldsets, current, look_ahead_algorithms[algorithm], debug=debug)
-            if len(max_effects) == 0:
-                next_foldset = frozenset()
-                max_effects[next_foldset] = deepcopy(current)
-                print("No foldsets remaining.")
-            else:
-                foldset_tuples = sorted([sorted(tuple(i)) for i in max_effects.keys()]) ## cast as tuples for predictable sorting
-                if ordered_outcome:
-                    next_foldset = frozenset(foldset_tuples[0])
-                else:
-                    next_foldset = frozenset(random.choice(foldset_tuples)) ## change back to frozenset
-            return next_foldset, max_effects #[next_foldset]
+            max_effects = self.loop_through_remaining_foldsets_look_ahead(size2foldsets, current, look_ahead_algorithms[algorithm], debug=debug)
+            next_foldset, max_effects = self.choose_next_foldset_look_ahead(current, max_effects, ordered_outcome)
 
         elif algorithm in no_look_ahead_algorithms:
-            next_foldset, max_effects = self.no_look_ahead_loop_through_remaining_foldsets(size2foldsets, current, no_look_ahead_algorithms[algorithm], debug=debug, ordered_outcome=ordered_outcome)
-            return next_foldset, max_effects
+            max_foldsets = self.loop_through_remaining_foldsets_no_look_ahead(size2foldsets, current, no_look_ahead_algorithms[algorithm], debug=debug, ordered_outcome=ordered_outcome)
+            next_foldset, max_effects = self.choose_next_foldset_no_look_ahead(current, max_foldsets, ordered_outcome)
 
         else:
             raise(ValueError("algorithm not found."))
 
-    # def keep_going(self, current):
+        return next_foldset, max_effects
 
-    #     ## It should always stop if we've found all scope cpds, rns
-    #     ## actually it might be possible to discover all reactions and compounds but not all rules
-    #     ## but if we've discovered all folds then we've discovered all rules
-    #     if ((set(self.scope.cpds).issubset(set(current.cpds))) and 
-    #         (set(self.scope.rns).issubset(set(current.rns))) and 
-    #         (set(self.scope.folds).issubset(set(current.folds)))):
-    #         print("Reached scope compounds, reactions, and folds.")
-    #         return False
+    def keep_going(self, current, algorithm):
 
-    #     else:
-    #         return True
+        ## It should always stop if we've found all scope cpds, rns
+        ## actually it might be possible to discover all reactions and compounds but not all rules
+        ## but if we've discovered all folds then we've discovered all rules
 
-    def rule_order(self, algorithm="max_rules", write=False, path=None, str_to_append_to_fname=None, debug=False, ordered_outcome=False):
+        if algorithm in ["look_ahead_rules", "no_look_ahead_rules"]:
+            if set(self.scope.folds).issubset(set(current.folds)):
+                print("Reached scope folds.")
+                return False
+
+        elif algorithm in ["look_ahead_rns", "no_look_ahead_rns"]:
+            if set(self.scope.rns).issubset(set(current.rns)):
+                print("Reached scope reactions.")
+                return False
+        
+        elif algorithm in ["look_ahead_cpds", "no_look_ahead_cpds"]:
+            if set(self.scope.cpds).issubset(set(current.cpds)):
+                print("Reached scope compounds.")
+                return False
+
+        else:
+            return True
+
+    def rule_order(self, algorithm, write=False, path=None, str_to_append_to_fname=None, debug=False, ordered_outcome=False):
         """
         Determine the ordering of all rules/folds.
         """
@@ -535,13 +548,13 @@ class FoldMetabolism:
         result.update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
         ## Needed in case expansion not possible at all
-        keep_going = self.keep_going(current)
+        keep_going = self.keep_going(algorithm, current)
 
         ################################################
         ## ITERATION 2+
         while keep_going:
             size2foldsets = self.sort_remaining_foldsets_by_size(current.folds)
-            next_foldset, max_effects = self.select_next_foldset(algorithm, size2foldsets, current, debug=debug, ordered_outcome=ordered_outcome)
+            next_foldset, max_effects = self.choose_next_foldset(algorithm, size2foldsets, current, debug=debug, ordered_outcome=ordered_outcome)
             effects = max_effects[next_foldset]
 
             if len(next_foldset)==0:
@@ -555,7 +568,6 @@ class FoldMetabolism:
                 current.rules = self.scope.rules.subset_from_folds(current.folds).subset_from_rns(current.rns)
                 metadata.max_effects = max_effects
                 metadata.size2foldsets = size2foldsets
-                
 
             ## Store when cpds and rns appear in the expansion
             result.update(current, metadata=metadata, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
@@ -568,122 +580,59 @@ class FoldMetabolism:
 
         return result
 
-    # def select_next_rule_or_fold(self, current_folds, current_cpds, current_rns, remaining_folds, remaining_rules, algorithm="maxreactionsupersets"):#rselect_func=maxreactions):
-    #     """
-    #     Determines the next rule and its effects on cpds, rns, and rules, based on the selection function.
-
-    #     :param current_folds: collection of current folds
-    #     :param current_cpds: collection of current compounds
-    #     :param current_rns: collection of current reactions
-    #     :param rselect_func: function to use for identifying the next rule
-    #     :return:- next_rule and ...
-    #             - ... dictionary of its effects {rule2rn:... , cpds:... , rns:...} 
-    #             - and for metadata purposes, also return the number of rules checked
-    #             - and the number of equal rule groups this iteration
-    #     """
-    #     if algorithm == "randomfold":
-    #         next_fold = random.choice(remaining_folds)
-    #         _fdict = dict()
-    #         _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(next_fold, current_folds, current_cpds)
-    #         return next_fold, _fdict, 1, 0
-
-    #     elif algorithm == "randomrule":
-    #         rule_size_dict = rule_sizes(remaining_rules)
-    #         next_rule = random.choice(rule_size_dict[min(rule_size_dict)])
-    #         _fdict = dict()
-    #         _fdict["rule2rns"], _fdict["cpds"], _fdict["rns"] = self.effect_per_rule_or_fold(next_fold, current_folds, current_cpds)
-    #         return next_rule, _fdict, 1, 0
-            
-    #     elif algorithm == "maxreactionsupersets":
-    #         r_effects, n_rules_checked, n_rules_skipped = self.loop_through_rules(current_cpds, current_rns, current_folds, remaining_rules)
-    #         if len(r_effects) == 0:
-    #             next_rule = frozenset()
-    #             r_effects[next_rule] = {"cpds":deepcopy(current_cpds), "rns":deepcopy(current_rns)}
-    #             print("NO R_EFFECTS REMAINING")
-    #         else:
-    #             next_rule = random.choice(sorted(r_effects.keys()))
-    #         return next_rule, r_effects[next_rule], n_rules_checked, n_rules_skipped #, er_effects
-
-    #     ## Assuming you start with all scope compounds in the seed set, pick fold order based on fold which enables the most reactions
-    #     elif algorithm == "allcompoundsseedmaxreactions":
-    #         # for r in remaining_rules:
-    #         #     potential_fold_set = (current_folds | set(rule))
-    #         #     potential_rule2rns = subset_rule2rn_from_folds(potential_fold_set, self.scope_rules2rn)
-
-    #         future_rule2rns = {k:(v | current_rns) for k,v in remaining_rules.items() if len(v-current_rns)>0}
-    #         rule_sizes = sorted(set([len(i) for i in future_rule2rns]))
-
-    #         ## Organizes rules by size
-    #         future_rule2rns_by_size = {size:dict() for size in rule_sizes}
-    #         for rule, rns in future_rule2rns.items():
-    #             future_rule2rns_by_size[len(rule)][rule]=rns
-
-    #         for size in rule_sizes:
-    #             future_rule2rns_by_size_sorted = sorted(future_rule2rns_by_size[size], key=lambda k: len(future_rule2rns_by_size[size][k]), reverse=True)
-    #             # future_rule2rns[rule] for rule in future_rule2rns_by_size_sorted:
-    #                 # rns = future_rule2rns[rule]
-
-
-    #         ## Don't look for longer rules if shorter rules enable new reactions
-    #         # if len(max_r_effects)>0:
-    #         #     break
-
-    #     ## picks folds maximizing the number of rules
-    #     elif algorithm == "allcompoundsseedmaxrules":
-
-    #         rules_minus_current_folds = {k-current_folds:v for k,v in remaining_rules.items()}
-    #         rule_sizes = sorted(set([len(i) for i in rules_minus_current_folds]))
-    #         # print(rule_sizes)
-    #         ## Do we still want rule to be added even if it only maps to reactions which are already in the network?
-    #         ## case 1: want to find rule regardless of it mapping to reactions already in the network
-
-    #         ## case 2: want to find rule only if it maps to reactions not in the network
-    #         # pprint(rules_minus_current_folds)
-
-    #         ## pick fold that immeasiately enables the most rules 
-    #         fold2activatedRuleCounter = Counter([f for k in rules_minus_current_folds for f in k if len(k)==min(rule_sizes)])
-    #         fold2activatedRuleMaxValue = max(fold2activatedRuleCounter.values())
-    #         fold2activatedRuleMaxFold = [k for k,v in fold2activatedRuleCounter.items() if v==fold2activatedRuleMaxValue]
-    #         print(fold2activatedRuleMaxFold)
-    #         next_rule = random.choice(sorted(r_effects.keys()))
-
-    #         ## need to make a conversion between fold2rule and rule2fold
-
-    #     ## Need to choose an option that picks folds which maximize the number of rules
-    #     # elif algorithm == "maxrules":
-    #     #     blah blah blah
-
-    #     # elif algorithm == "maxreactions":
-    #     #     r_effects, n_rules_checked, n_equal_rule_groups = self.loop_through_rules(current_folds, current_cpds, current_rns)
-
 def example_main():
     asset_path = nf.asset_path
 
-    ALGORITHM = "max_rules"
-    WRITE = False
-    PATH = None
-    STR_TO_APPEND_TO_FNAME = "EXAMPLE"
+    ALGORITHM = "no_look_ahead_rules"
+    WRITE = False # write result to disk
+    CUSTOM_WRITE_PATH = None # if writing result, custom path to write to
+    STR_TO_APPEND_TO_FNAME = "EXAMPLE" # if writing result, str to append to filename
+    ORDERED_OUTCOME = False # ignore random seed and always choose folds based on sort order
+    METABOLISM_PATH = PurePath(asset_path, "metabolic_networks","metabolism.23Aug2022.pkl") # path to metabolism object pickle
+    RN2RULES_PATH = PurePath("data","rn2fold","rn2rules_v.pkl") # path to rn2rules object pickle
+    SEED_CPDS_PATH = PurePath("data", "josh", "seed_set.csv") # path to seed compounds csv
 
     ## Metabolism
-    metabolism_path = PurePath(asset_path) / "metabolic_networks" / 'metabolism.23Aug2022.pkl'
-    metabolism = pd.read_pickle(metabolism_path)
+    metabolism = pd.read_pickle(METABOLISM_PATH)
 
     ## FoldRules
-    rn2rules = pd.read_pickle(PurePath("data","rn2fold","rn2rules_v.pkl"))
+    rn2rules = pd.read_pickle(RN2RULES_PATH)
     foldrules = nf.FoldRules.from_rn2rules(rn2rules)
 
+    ## Modify seeds with AA and GATP_rns
+    aa_cids = set(["C00037",
+        "C00041",
+        "C00065",
+        "C00188",
+        "C00183",
+        "C00407",
+        "C00123",
+        "C00148",
+        "C00049",
+        "C00025"])
+
+    GATP_rns = {'R00200_gATP_v1',
+        'R00200_gATP_v2',
+        'R00430_gGTP_v1',
+        'R00430_gGTP_v2',
+        'R01523_gATP_v1',
+        'R04144_gATP_v1',
+        'R04208_gATP',
+        'R04463_gATP',
+        'R04591_gATP_v1',
+        'R06836_gATP',
+        'R06974_gATP',
+        'R06975_gATP_v1'}
+
     ## Seed
-    fold_independent_rns =  set(metabolism.network["rn"]) - set(rn2rules)
-    seed_cpds_path = PurePath("data", "josh", "seed_set.csv")
-    seed_cpds = set((pd.read_csv(seed_cpds_path)["ID"])) #| aa_cids
     seed = nf.Params(
-        rns = fold_independent_rns,
-        cpds = seed_cpds,
+        rns = set(metabolism.network["rn"]) - set(rn2rules) | GATP_rns,
+        cpds = set((pd.read_csv(SEED_CPDS_PATH)["ID"])) | aa_cids,
         folds = set(['spontaneous'])
     )
 
     ## Inititalize fold metabolism
     fm = nf.FoldMetabolism(metabolism, foldrules, seed)
     ## Run fold expansion
-    result = fm.rule_order(algorithm=ALGORITHM, write=WRITE, path=PATH, str_to_append_to_fname=STR_TO_APPEND_TO_FNAME)
+    result = fm.rule_order(algorithm=ALGORITHM, write=WRITE, path=CUSTOM_WRITE_PATH, str_to_append_to_fname=STR_TO_APPEND_TO_FNAME, ordered_outcome=ORDERED_OUTCOME)
     
