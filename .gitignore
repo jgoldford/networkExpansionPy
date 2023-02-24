@@ -89,4 +89,4 @@ ipython_config.py
 .vscode
 
 # pkl files that might show up when running tests
-*.pkl
+test/*/*.pkl
