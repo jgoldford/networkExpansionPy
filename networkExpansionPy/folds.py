@@ -63,13 +63,49 @@ class Params(ImmutableParams):
         self._rules = deepcopy(value)
 
 class Metadata:
+    """
+    A class for storing data that's useful to know but not critical for success of the expansion.
+
+    Attributes:
+        max_effects (dict): A dictionary containing all possible foldsets which could be injected after each iteration.
+        size2foldsets (dict): A dictionary containing remaining foldsets keyed by size after each iteration.
+    """
     def __init__(self):
         self.size2foldsets = None
         self.max_effects = None
 
 class Result:
     """
-    Store data from the run
+    A class for storing data from the run.
+
+    Attributes:
+        iteration (int): The current iteration number.
+        cpds (dict): A dictionary containing compounds and what iteration they appear.
+        rns (dict): A dictionary containing reactions and what iteration they appear.
+        folds (dict): A dictionary containing folds and what iteration they appear.
+        rules (dict): A dictionary containing rules and what iteration they appear.
+        start_datetime (str): A string representing the start date and time of the run.
+        start_time (float): The start time of the run in seconds.
+        iteration_time (dict): A dictionary containing iteration times.
+        final_path (str): A string representing the path to the final result file.
+        temp_path (str): A string representing the path to the temporary result file.
+        max_effects (dict): A dictionary containing all possible foldsets which could be injected after each iteration.
+        size2foldsets (dict): A dictionary containing remaining foldsets keyed by size after each iteration.
+
+    Methods:
+        first_update: Updates the object attributes on the first iteration.
+        update: Updates the object attributes on any other iteration.
+        update_cpds: Updates the cpds attribute.
+        update_rns: Updates the rns attribute.
+        update_folds: Updates the folds attribute.
+        update_rules: Updates the rules attribute.
+        update_iteration_time: Updates the iteration_time attribute.
+        update_max_effects: Updates the max_effects attribute.
+        update_size2foldsets: Updates the size2foldsets attribute.
+        update_iter: Updates the iteration attribute.
+        get_path: Returns the path to the result file.
+        temp_write: Writes temporary results to a file.
+        final_write: Writes final results to a file.
     """
 
     def __init__(self):
@@ -178,6 +214,23 @@ class Result:
         print("Final results written to:\n{}".format(self.final_path))
 
 class Rule:
+    """
+    A class representing a fold rule.
+
+    Attributes:
+        rn: the rule's associated rn
+        foldset (frozenset): a set of folds that trigger the rule
+        id (tuple): a unique identifier for the rule (rn, foldset)
+
+    Methods:
+        __hash__(): returns the hash value of the rule's id
+        __eq__(other): returns True if the other rule has the same id
+        __repr__(): returns a string representation of the rule
+
+    Usage:
+        Create a new Rule object by providing the rule id and a set of folds that trigger the rule.
+        The id attribute is automatically generated and used to compare rules for equality and hashing.
+    """
 
     def __init__(self,rn,foldset:frozenset):
         self.rn = rn
@@ -197,7 +250,31 @@ class Rule:
 
 class FoldRules:
     """
-    Object that stores Rules. This is the universe of possible fold rules. 
+    Object that stores a universe of possible fold rules.
+
+    Attributes:
+        rules (list): a list of Rule objects
+        rns (set): the set of unique rns in FoldRules
+        folds (set): the set of unique folds in FoldRules
+        foldsets (set): the set of unique foldsets in FoldRules
+        ids (set): the set of unique ids in FoldRules
+
+    Methods:
+        from_rn2rules(rn2rules): create a new FoldRules object from a dictionary of rns to foldsets
+        subset_from_rns(rns): create a new FoldRules object containing only rules with the given rn
+        subset_from_folds(folds): create a new FoldRules object containing only rules whose foldsets are entirely within the given folds
+        remaining_rules(current_folds): create a new FoldRules object containing only rules remaining after all rules possible with current_folds is accounted for
+        foldset2rules(): return a dictionary mapping frozensets of folds to lists of rules
+        to_list(): return a list of Rule objects
+        __len__(): return the number of rules in FoldRules
+        __iter__(): return an iterator over the Rule objects
+
+    Usage:
+        Create a new FoldRules object by providing a list of Rule objects. You can also use the `from_rn2rules` method
+        to create a new FoldRules object from a dictionary of reactions to frozensets of folds. The `subset_from_rns`,
+        `subset_from_folds`, and `remaining_rules` methods allow you to create new FoldRules objects that are subsets of
+        the original universe based on reactions or folds. The `foldset2rules` method returns a dictionary that maps
+        frozensets of folds to rules.
     """
 
     def __init__(self,rules:list):
@@ -249,14 +326,9 @@ class FoldRules:
 
     def subset_from_rns(self, rns):
         return FoldRules([r for r in self.rules if r.rn in rns])
-        # return FoldRules([self.rn2rule[r] for r in rns])
 
     def subset_from_folds(self, folds):
         return FoldRules([r for r in self.rules if r.foldset <=folds])
-        # return Rules([self.fs2rule[r] for r in rns])
-
-    # def subset_from_foldsets(self, foldsets):
-    #     return FoldRules([r for r in self.rules if r.foldset in foldsets])
 
     def remaining_rules(self, current_folds):
         return FoldRules([r for r in self.rules if len(r.foldset-current_folds)>0])
@@ -279,18 +351,14 @@ class FoldRules:
 class FoldMetabolism:
     """
     A class to do fold expansion from a metabolism, foldrules, and seeds.
-    """
 
-    def __init__(self, metabolism, foldrules, seed):#, preexpansion=False):
+    Attributes:        
+        metabolism (GlobalMetabolicNetwork): defines the compound/reaction rules of network expansion
+        foldrules (FoldRules): defines the fold rules of fold expansion
+        seed (Params): a Params object that defines the initial compounds, folds, and reactions (these are fold independent reactions)
         """
-        Calculates expansion scope after seed compounds are defined. 
 
-        :param metabolism: a GlobalMetabolicNetwork object that defines the compound/reaction rules of network expansion
-        :param foldrules: a FoldRules object that defines the fold rules of fold expansion
-        :param seed: a Params object that defines the initial compounds, folds, and reactions (these are fold independent reactions)
-        :kwarg preexpansion: NOT YET IMPLEMENTED -- but the idea is to allow n steps of regular network expansion before beginning fold expansion
-        """
-        
+    def __init__(self, metabolism, foldrules, seed):#, preexpansion=False):        
         self._m = metabolism ## GlobalMetabolicNetwork object
         self._f = foldrules # FoldRules object
         self._seed = ImmutableParams(folds=seed.folds, rns=seed.rns, cpds=seed.cpds) ## seed.rns == fold_independent_rns
@@ -320,10 +388,13 @@ class FoldMetabolism:
         return self._scope
     def calculate_scope(self, seed):
         """
-        Calculate the scope of the seed with all reactions enabled by the global fold network (including fold independent reactions i.e. seed.rns)
+        Calculates the scope of the seeds with all reactions enabled by the global fold network (including fold independent reactions i.e. seed.rns)
 
-        :param seed: an ImmutableParams object with seed.rns and seed.cpds != None
-        :return: an ImmutableParams object specificying the scope
+        Arguments:
+            seed (ImmutableParams): object with seed information
+        
+        Outputs:
+            ImmutableParams object specificying the scope
         """
         print("calculating scope...")
         rn_tup_set = set(self.m.rxns2tuple((self.f.rns | self.seed.rns)))
@@ -339,13 +410,17 @@ class FoldMetabolism:
 
     def fold_expand(self, folds, current_cpds, fold_algorithm="naive"):
         """
-        Returns a set of compounds and set of reactions enabled by expansion 
-        using `current_cpds` and the reactions enabled by `folds` and fold independent 
-        reactions (seed.rns).
+        Expand the given set of compounds and rules using the specified fold algorithm and a subset of the rules based on the given folds.
 
-        :param current_cpds: collection of compound ids
-        :param folds: collection of fold ids
-        :return: set of compounds and set of reactions from the expansion
+        Arguments:
+            folds (list): collection of folds for expansion
+            current_cpds (list): collection of compounds
+            fold_algorithm (str, optional): The name of the algorithm to use for expanding the compounds and rules. Defaults to "naive".
+
+        Returns:
+            A tuple containing two sets from the expansion: 
+            1. Set of compounds
+            2. Set of reactions
         """
 
         possible_rules = self.f.subset_from_folds(folds)
@@ -353,15 +428,31 @@ class FoldMetabolism:
         cx,rx = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, reaction_mask=rn_tup_set)
         return set(cx), set([i[0] for i in rx])
 
-    def sort_remaining_foldsets_by_size(self, current_folds):#, remaining_rules):
-        ## remove current.folds from all foldsets, and return those foldsets
-        remaining_rules = self.scope.rules.remaining_rules(current_folds) # the already found rules aren't necessarily activated
+    def sort_remaining_foldsets_by_size(self, current_folds):
+        """
+        Sorts and returns the remaining foldsets based on their size after removing the current foldsets.
+
+        Arguments:
+            current_folds (set): A set of current folds to be removed from all foldsets.
+
+        Returns:
+            A dict of foldsets keyed by their size after removing the current_folds.
+        """
+        remaining_rules = self.scope.rules.remaining_rules(current_folds) ## the already found rules aren't necessarily activated
         remaining_foldsets = set([i-current_folds for i in remaining_rules.foldsets]) ## excludes folds already discovered
         return self.sort_foldsets_by_size(remaining_foldsets)
 
     def sort_foldsets_by_size(self, foldsets):
+        """
+        Sorts and returns foldsets based on their size.
+
+        Arguments:
+            foldsets (set): A set of foldsets to sort.
+
+        Returns:
+            A dict of foldsets keyed by their size.
+        """
         rule_sizes = sorted(set([len(i) for i in foldsets]) - set([0]))
-        ## Organizes rules by size
         size2foldsets = {size:list() for size in rule_sizes}
 
         foldset_tuples = sorted([sorted(tuple(i)) for i in foldsets]) ## cast as tuples for predictable sorting
