@@ -482,7 +482,7 @@ class FoldMetabolism:
         one_step_effects = Params()
         one_step_effects.cpds, one_step_effects.rns = self.fold_expand(self.scope.folds, current.cpds, fold_algorithm="step")
 
-        finished = False
+        max_foldsets = list()
         for size in sorted(size2foldsets.keys()):
 
             possible_next_rules = self.scope.rules.remaining_rules(current.folds).subset_from_rns(one_step_effects.rns)
@@ -758,7 +758,7 @@ def example_main():
     asset_path = nf.asset_path
 
     ALGORITHM = "no_look_ahead_rules"
-    WRITE = False # write result to disk
+    WRITE = True # write result to disk
     CUSTOM_WRITE_PATH = None # if writing result, custom path to write to
     STR_TO_APPEND_TO_FNAME = "EXAMPLE" # if writing result, str to append to filename
     ORDERED_OUTCOME = False # ignore random seed and always choose folds based on sort order
