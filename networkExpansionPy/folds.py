@@ -462,8 +462,21 @@ class FoldMetabolism:
         return size2foldsets
 
     def loop_through_remaining_foldsets_no_look_ahead(self, size2foldsets, current, key_to_maximize, debug=False, ordered_outcome=False):
+        """
+        Loop through remaining foldsets with no look-ahead, returning the foldset(s) that maximize the given key.
+        
+        Arguments:
+            size2foldsets (dict): A dictionary with foldset sizes as keys and sets of foldsets as values.
+            current (Params): A Params object representing the current state of the fold expansion.
+            key_to_maximize (str): A string specifying the key to maximize ("rns", "cpds", or "rules").
+            debug (bool, optional): Whether to print debug information (default: False).
+            ordered_outcome (bool, optional): Whether to return the foldsets in an ordered list (default: False).
+        
+        Returns:
+            List of the foldset(s) that maximize the given key.
+        """
 
-         ## key_to_maximize is one of "rns", "cpds", "rules"
+        ## key_to_maximize is one of "rns", "cpds", "rules"
         if key_to_maximize=="folds":
             raise(ValueError("It doesn't make sense to choose a fold which maximizes number of folds."))
 
@@ -489,6 +502,19 @@ class FoldMetabolism:
         return max_foldsets
 
     def loop_through_remaining_foldsets_look_ahead(self, size2foldsets, current, key_to_maximize, debug=False):
+        """
+        Loop through remaining foldsets with look-ahead, returning the foldset(s) that maximize the given key.
+        
+        Arguments:
+            size2foldsets (dict): A dictionary with foldset sizes as keys and sets of foldsets as values.
+            current (Params): A Params object representing the current state of the fold expansion.
+            key_to_maximize (str): A string specifying the key to maximize ("rns", "cpds", or "rules").
+            debug (bool, optional): Whether to print debug information (default: False).
+        
+        Returns:
+            A dictionary with foldsets as keys and Params objects as values. Each foldset in the dictionary maximizes the given key_to_maximize. The Params objects represent the effects of adding the corresponding foldset and include keys for "folds", "cpds", "rns", and "rules".
+        """
+        
         ## key_to_maximize is one of "rns", "cpds", "rules"
         if key_to_maximize=="folds":
             raise(ValueError("It doesn't make sense to choose a fold which maximizes number of folds."))
@@ -539,7 +565,20 @@ class FoldMetabolism:
                 break
         return max_effects
 
-    def choose_next_foldset_no_look_ahead(self, current, max_foldsets, ordered_outcome):
+    def choose_next_foldset_no_look_ahead(self, current, max_foldsets, ordered_outcome=False):
+        """
+        Given the current foldset, choose the next foldset to expand using the no-look-ahead algorithm.
+
+        Args:
+            current (Params): The current state of the fold expansion.
+            max_foldsets (list): List of frozenset objects representing the maximum effect foldsets to consider for expansion.
+            ordered_outcome (bool): Whether to select the next foldset deterministically or randomly. (default:False)
+
+        Returns:
+            Tuple containing:
+            - Next foldset to expand represented as a frozenset object.
+            - Dictionary containing the effects of the expansion on the model, where each key is a frozenset object representing a foldset, and the corresponding value is a Params object representing the updated model state.
+        """
         if len(max_foldsets)>0:
             foldset_tuples = sorted([sorted(tuple(i)) for i in max_foldsets]) ## cast as tuples for predictable sorting
             if ordered_outcome:
@@ -559,7 +598,20 @@ class FoldMetabolism:
             print("No foldsets remaining.")
             return frozenset(), {frozenset():deepcopy(current)}
 
-    def choose_next_foldset_look_ahead(self, current, max_effects, ordered_outcome):
+    def choose_next_foldset_look_ahead(self, current, max_effects, ordered_outcome=False):
+        """
+        Given the current foldset, choose the next foldset to expand using the look-ahead algorithm.
+
+        Args:
+            current (Params): The current state of the fold expansion.
+            max_effects (dict): Dictionary where each key is a frozenset object representing a foldset, and the corresponding value is a Params object representing the maximum effects of expanding that foldset.
+            ordered_outcome (bool): Whether to select the next foldset deterministically or randomly. (default:False)
+
+        Returns:
+            Tuple containing:
+            - Next foldset to expand represented as a frozenset object.
+            - Dictionary containing the effects of the expansion on the model, where each key is a frozenset object representing a foldset, and the corresponding value is a Params object representing the updated model state.
+        """
         if len(max_effects) == 0:
                 next_foldset = frozenset()
                 max_effects[next_foldset] = deepcopy(current)
@@ -573,6 +625,21 @@ class FoldMetabolism:
         return next_foldset, max_effects #[next_foldset]
 
     def choose_next_foldset(self, algorithm, size2foldsets, current, debug=False, ordered_outcome=False):
+        """
+        Given the current foldset, choose the next foldset to expand using the specified algorithm.
+
+        Arguments:
+            algorithm (str): The algorithm to use for choosing the next foldset.
+            size2foldsets (dict): A dict where each key is a tuple of size values, and the corresponding value is a list of frozenset objects representing the foldsets with those size values.
+            current (Params): The current state of the fold expansion.
+            debug (bool, optional): Whether to print debug information. (defualt: False)
+            ordered_outcome (bool, optional): Whether to select the next foldset deterministically or randomly. (default: False)
+
+        Returns:
+            Tuple containing:
+            - Next foldset to expand represented as a frozenset.
+            - Dictionary containing the effects of the expansion on the model, where each key is a frozenset object representing a foldset, and the corresponding value is a Params object representing the updated model state.
+        """
 
         look_ahead_algorithms = {
             "look_ahead_rules":"rules",
@@ -599,10 +666,16 @@ class FoldMetabolism:
         return next_foldset, max_effects
 
     def keep_going(self, current, algorithm):
+        """
+        Determines whether the fold expansion should stop based on current state of the expansion and the specified algorithm.
 
-        ## It should always stop if we've found all scope cpds, rns
-        ## actually it might be possible to discover all reactions and compounds but not all rules
-        ## but if we've discovered all folds then we've discovered all rules
+        Arguments:
+            current (Params):  The current state of the fold expansion.
+            algorithm (str): The algorithm to use for choosing the next foldset.
+
+        Returns:
+            True if the expansion should continue.
+        """
 
         if algorithm in ["look_ahead_rules", "no_look_ahead_rules"]:
             if set(self.scope.folds).issubset(set(current.folds)):
@@ -625,6 +698,17 @@ class FoldMetabolism:
     def rule_order(self, algorithm, write=False, path=None, str_to_append_to_fname=None, debug=False, ordered_outcome=False):
         """
         Determine the ordering of all rules/folds.
+
+        Args:
+            algorithm (str): The algorithm to use for determining the rule/fold order.
+            write (bool, optional): If True, write the results to a file. (default: False)
+            path (str, optional): The path to the directory where the results file should be written. (default: None)
+            str_to_append_to_fname (str, optional): A string to append to the end of the results file name. (default: None)
+            debug (bool, optional): If True, print debug information. (default: False)
+            ordered_outcome (bool, optional): Whether to select the next foldset deterministically or randomly. (default: False)
+
+        Returns:
+            A `Result` object that stores the results of the rule/fold ordering algorithm.
         """
         ## Place to store results and current state of expansion
         ## ITERATION 0 (Avoid updating folds on the 0th iteration since they don't apply until iteration=1)
