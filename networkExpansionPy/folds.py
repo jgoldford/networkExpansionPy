@@ -698,7 +698,7 @@ class FoldMetabolism:
         """
         Determine the ordering of all rules/folds.
 
-        Args:
+        Arguments:
             algorithm (str): The algorithm to use for determining the rule/fold order.
             write (bool, optional): If True, write the results to a file. (default: False)
             path (str, optional): The path to the directory where the results file should be written. (default: None)
@@ -763,8 +763,8 @@ def example_main():
     STR_TO_APPEND_TO_FNAME = "EXAMPLE" # if writing result, str to append to filename
     ORDERED_OUTCOME = False # ignore random seed and always choose folds based on sort order
     METABOLISM_PATH = PurePath(asset_path, "metabolic_networks","metabolism.23Aug2022.pkl") # path to metabolism object pickle
-    RN2RULES_PATH = PurePath("data","rn2fold","rn2rules_v.pkl") # path to rn2rules object pickle
-    SEED_CPDS_PATH = PurePath("data", "josh", "seed_set.csv") # path to seed compounds csv
+    RN2RULES_PATH = PurePath(asset_path,"rn2fold","rn2rules.20230224.pkl") # path to rn2rules object pickle
+    SEED_CPDS_PATH = PurePath(asset_path, "compounds", "seeds.Goldford2022.csv") # path to seed compounds csv
 
     ## Metabolism
     metabolism = pd.read_pickle(METABOLISM_PATH)
