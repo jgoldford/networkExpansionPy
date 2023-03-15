@@ -5,6 +5,7 @@ import pandas as pd
 from scipy.sparse import csr_matrix, SparseEfficiencyWarning
 from pprint import pprint
 import random
+from pathlib import PurePath
 
 import warnings
 # warnings.filterwarnings('ignore', category=SparseEfficiencyWarning) ## must be applied within each test
@@ -131,7 +132,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
 
         self.assertEqual(expected_foldsets_by_size, fm.sort_foldsets_by_size(foldsets))
 
-    def test_loop_through_remaining_foldsets(self):
+    def test_loop_through_remaining_foldsets_look_ahead(self):
         foldrules = nf.FoldRules.from_rn2rules(self.rn2rules)
         seed = nf.Params(
             rns = set([]),
@@ -144,7 +145,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         size2foldsets = fm.sort_remaining_foldsets_by_size(current.folds)
         key_to_maximize = "rules"
         
-        max_effects = fm.loop_through_remaining_foldsets(size2foldsets, current, key_to_maximize)
+        max_effects = fm.loop_through_remaining_foldsets_look_ahead(size2foldsets, current, key_to_maximize)
 
         self.assertTrue(frozenset({"F0"}) in max_effects)
         self.assertEqual(max_effects[frozenset({'F0'})].cpds, {'C1', 'C0'})
@@ -152,7 +153,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         self.assertEqual(max_effects[frozenset({'F0'})].folds, set(['F0']))
         self.assertEqual(max_effects[frozenset({'F0'})].rules.ids, {('R0', frozenset({'F0'}))} )
 
-    def test_select_next_foldset(self):
+    def test_choose_next_foldset(self):
         foldrules = nf.FoldRules.from_rn2rules(self.rn2rules)
         seed = nf.Params(
             rns = set([]),
@@ -165,7 +166,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         size2foldsets = fm.sort_remaining_foldsets_by_size(current.folds)
         algorithm = "look_ahead_rules"
 
-        next_foldset, effects = fm.select_next_foldset(algorithm, size2foldsets, current)
+        next_foldset, effects = fm.choose_next_foldset(algorithm, size2foldsets, current)
         self.assertEqual(next_foldset, frozenset({'F0'}))
 
     def test_FoldMetabolism_rule_order_C0_no_indepdendent(self):
@@ -365,6 +366,105 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         self.assertEqual(final_result.rns, temp_result.rns)
         self.assertEqual(final_result.folds, temp_result.folds)
         self.assertEqual(final_result.rules, temp_result.rules)
+
+class TestGlobalFoldNetworkReal(unittest.TestCase):
+    """THESE ARE SLOW TESTS! EACH METHOD IS MAYBE 1.5 MIN"""
+
+
+    maxDiff = None ## allows full output of failed test differences
+
+    def setUp(self):
+        warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
+        asset_path = nf.asset_path
+
+        METABOLISM_PATH = PurePath(asset_path, "metabolic_networks","metabolism.23Aug2022.pkl") # path to metabolism object pickle
+        RN2RULES_PATH = PurePath(asset_path, "rn2fold","rn2rules.20230224.pkl") # path to rn2rules object pickle
+        SEED_CPDS_PATH = PurePath(asset_path, "compounds", "seeds.Goldford2022.csv") # path to seed compounds csv
+
+        ## Metabolism
+        metabolism = pd.read_pickle(METABOLISM_PATH)
+
+        ## FoldRules
+        rn2rules = pd.read_pickle(RN2RULES_PATH)
+        foldrules = nf.FoldRules.from_rn2rules(rn2rules)
+        popular_folds = set([
+            2002,
+            2007,
+            7560,
+            543,
+            210,
+            325,
+            205,
+            282,
+            246,
+            109])
+        popular_folds = set(str(i) for i in popular_folds)
+        foldrules = foldrules.subset_from_folds(popular_folds)
+
+        ## Modify seeds with AA and GATP_rns
+        aa_cids = set(["C00037",
+            "C00041",
+            "C00065",
+            "C00188",
+            "C00183",
+            "C00407",
+            "C00123",
+            "C00148",
+            "C00049",
+            "C00025"])
+
+        GATP_rns = {'R00200_gATP_v1',
+            'R00200_gATP_v2',
+            'R00430_gGTP_v1',
+            'R00430_gGTP_v2',
+            'R01523_gATP_v1',
+            'R04144_gATP_v1',
+            'R04208_gATP',
+            'R04463_gATP',
+            'R04591_gATP_v1',
+            'R06836_gATP',
+            'R06974_gATP',
+            'R06975_gATP_v1'}
+
+        ## Seed
+        seed = nf.Params(
+            rns = set(metabolism.network["rn"]) - set(rn2rules) | GATP_rns,
+            cpds = set((pd.read_csv(SEED_CPDS_PATH)["ID"])) | aa_cids,
+            folds = set(['spontaneous'])
+        )
+
+        ## Inititalize fold metabolism
+        self.fm = nf.FoldMetabolism(metabolism, foldrules, seed)
+        ## Run fold expansion
+
+    def test_run_no_look_ahead_rules_sanity(self):
+        ALGORITHM = "no_look_ahead_rules"
+        result = self.fm.rule_order(algorithm=ALGORITHM, ordered_outcome=True)
+
+        self.assertEqual((set(result.cpds) - self.fm.seed.cpds), self.fm.scope.cpds - self.fm.seed.cpds)
+        self.assertEqual(set(result.cpds), self.fm.scope.cpds | self.fm.seed.cpds)
+        self.assertEqual((set(result.rns) - self.fm.seed.rns), self.fm.scope.rns - self.fm.seed.rns)
+        self.assertEqual(set(result.rns), self.fm.scope.rns | self.fm.seed.rns)
+        self.assertEqual(set(result.rules), self.fm.scope.rules.ids)
+        self.assertEqual(set(result.folds) - {"fold_independent", "spontaneous"}, self.fm.scope.folds)
+
+    def test_run_no_look_ahead_rns_sanity(self):
+        ALGORITHM = "no_look_ahead_rns"
+        result = self.fm.rule_order(algorithm=ALGORITHM, ordered_outcome=True)
+
+        self.assertEqual((set(result.cpds) - self.fm.seed.cpds), self.fm.scope.cpds - self.fm.seed.cpds)
+        self.assertEqual(set(result.cpds), self.fm.scope.cpds | self.fm.seed.cpds)
+        self.assertEqual((set(result.rns) - self.fm.seed.rns), self.fm.scope.rns - self.fm.seed.rns)
+        self.assertEqual(set(result.rns), self.fm.scope.rns | self.fm.seed.rns)
+
+    # def test_run_no_look_ahead_rns_sanity(self):
+    #     ALGORITHM = "no_look_ahead_rns"
+    #     result = self.fm.rule_order(algorithm=ALGORITHM, ordered_outcome=True)
+
+    #     self.assertEqual(len(result.cpds),len(self.fm.scope.cpds))
+    #     self.assertEqual(len(result.rns),len(self.fm.scope.rns))
+    #     self.assertEqual(len(result.rules),len(self.fm.scope.rules))
+    #     self.assertEqual(len(result.folds),len(self.fm.scope.folds))
 
 #### Tests to add
 # - test ordering of rules when there's an overlap with seed folds
