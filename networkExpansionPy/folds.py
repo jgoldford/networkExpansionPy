@@ -6,6 +6,7 @@ from pprint import pprint
 from datetime import datetime
 import random
 import pickle
+import re
 
 asset_path = PurePath(__file__).parent / "assets"
 
@@ -37,6 +38,16 @@ class ImmutableParams:
     @property
     def rules(self):
         return self._rules
+
+    def get_versionless_reactions(self):
+        versionless_reactions = list()
+        for i in self._rns:
+            match = re.match(r'(.+)_v\d', i)
+            if match!=None:
+                versionless_reactions.append(match[1])
+            else:
+                versionless_reactions.append(i)
+        return set(versionless_reactions)
 
 class Params(ImmutableParams):
     """
