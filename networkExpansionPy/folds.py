@@ -10,6 +10,16 @@ import re
 
 asset_path = PurePath(__file__).parent / "assets"
 
+def get_versionless_reactions(reactions):
+    versionless_reactions = list()
+    for i in reactions:
+        match = re.match(r'(.+)_v\d', i)
+        if match!=None:
+            versionless_reactions.append(match[1])
+        else:
+            versionless_reactions.append(i)
+    return set(versionless_reactions)
+
 class ImmutableParams:
     """
     Stores parameters that commonly need to be kept track of together.
@@ -38,16 +48,6 @@ class ImmutableParams:
     @property
     def rules(self):
         return self._rules
-
-    def get_versionless_reactions(self):
-        versionless_reactions = list()
-        for i in self._rns:
-            match = re.match(r'(.+)_v\d', i)
-            if match!=None:
-                versionless_reactions.append(match[1])
-            else:
-                versionless_reactions.append(i)
-        return set(versionless_reactions)
 
 class Params(ImmutableParams):
     """
