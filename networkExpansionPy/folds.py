@@ -548,7 +548,7 @@ class FoldMetabolism:
                 effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
 
                 if key_to_maximize == "rns" and ignore_reaction_versions:
-                    foldset2key_count[foldset] = len(get_versionless_reactions(effects.rns))
+                    n_new_set = len(get_versionless_reactions(effects.rns) - get_versionless_reactions(current.rns))
                 else:
                     n_new_set = len(set(getattr(effects, key_to_maximize)) - set(getattr(current, key_to_maximize)))
 
@@ -669,7 +669,7 @@ class FoldMetabolism:
         }
         
         if algorithm in look_ahead_algorithms:
-            max_effects = self.loop_through_remaining_foldsets_look_ahead(size2foldsets, current, look_ahead_algorithms[algorithm], debug=debug)
+            max_effects = self.loop_through_remaining_foldsets_look_ahead(size2foldsets, current, look_ahead_algorithms[algorithm], debug=debug, ignore_reaction_versions=ignore_reaction_versions)
             next_foldset, max_effects = self.choose_next_foldset_look_ahead(current, max_effects, ordered_outcome)
 
         elif algorithm in no_look_ahead_algorithms:
