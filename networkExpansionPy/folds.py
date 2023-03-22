@@ -503,7 +503,7 @@ class FoldMetabolism:
                 _foldset_rules = possible_next_rules.subset_from_folds(current.folds | foldset)
 
                 if key_to_maximize == "rns" and ignore_reaction_versions:
-                    foldset2key_count[foldset] = len(get_versionless_reactions(_foldset_rules["rns"]))
+                    foldset2key_count[foldset] = len(get_versionless_reactions(_foldset_rules.rns))
                 else:
                     foldset2key_count[foldset] = len(getattr(_foldset_rules, key_to_maximize))
             
@@ -515,7 +515,7 @@ class FoldMetabolism:
         
         return max_foldsets
 
-    def loop_through_remaining_foldsets_look_ahead(self, size2foldsets, current, key_to_maximize, debug=False):
+    def loop_through_remaining_foldsets_look_ahead(self, size2foldsets, current, key_to_maximize, debug=False, ignore_reaction_versions=False):
         """
         Loop through remaining foldsets with look-ahead, returning the foldset(s) that maximize the given key.
         
@@ -547,8 +547,10 @@ class FoldMetabolism:
                 effects.cpds, effects.rns = self.fold_expand(effects.folds, current.cpds)
                 effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
 
-                n_new = len(getattr(effects, key_to_maximize)) - len(getattr(current, key_to_maximize))
-                n_new_set = len(set(getattr(effects, key_to_maximize)) - set(getattr(current, key_to_maximize)))
+                if key_to_maximize == "rns" and ignore_reaction_versions:
+                    foldset2key_count[foldset] = len(get_versionless_reactions(effects.rns))
+                else:
+                    n_new_set = len(set(getattr(effects, key_to_maximize)) - set(getattr(current, key_to_maximize)))
 
                 if debug:
                     print("size: ", size)
@@ -562,13 +564,13 @@ class FoldMetabolism:
                     print("cpd_current - cpd_effects: ", set(current.cpds) - set(effects.cpds))
                     print("max_v: ", max_v)
                     print("max_v foldsets: ", max_effects.keys())
-                    print("n_new / n_new_set: ", n_new, n_new_set)
+                    print("n_new_set: ", n_new_set)
                     print("~"*40)
 
-                if n_new == max_v:
+                if n_new_set == max_v:
                     max_effects[foldset] = effects
-                elif n_new > max_v:
-                    max_v = n_new
+                elif n_new_set > max_v:
+                    max_v = n_new_set
                     max_effects = dict()
                     max_effects[foldset] = effects
                 else: # n_new < max_v
