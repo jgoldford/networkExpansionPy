@@ -488,11 +488,7 @@ class TestParams(unittest.TestCase):
             'R04591_gATP', 
             'photosyn_R09503_vX'}
 
-        ip = nf.ImmutableParams(rns=test_reactions)
-        self.assertEqual(expected_reactions, ip.get_versionless_reactions())
-
-        p = nf.Params(rns=test_reactions)
-        self.assertEqual(expected_reactions, p.get_versionless_reactions())
+        self.assertEqual(expected_reactions, nf.get_versionless_reactions(test_reactions))
 
 
 #### Tests to add
