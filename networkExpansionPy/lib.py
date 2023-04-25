@@ -7,6 +7,8 @@ import json
 from copy import copy, deepcopy
 import zipfile
 import pickle
+from concurrent.futures import ProcessPoolExecutor
+import multiprocessing
 
 # define asset path
 asset_path,filename = os.path.split(os.path.abspath(__file__))
@@ -418,6 +420,7 @@ class GlobalMetabolicNetwork:
         else:
             x0 = np.zeros([len(self.cid_to_idx)],dtype=int)
             for x in set(seedSet)&set(self.cid_to_idx.keys()):
+            #for x in set(map(tuple, seedSet)) & set(map(tuple, self.cid_to_idx.keys())):
                 x0[self.cid_to_idx[x]] = 1     
             return x0
 
@@ -800,4 +803,114 @@ class GlobalMetabolicNetwork:
         t = self.network[self.network.rn.isin(rn_list)][['rn','direction']].drop_duplicates()
         rn_list_tuple = list(zip(t.rn.tolist(),t.direction.tolist()))
         return rn_list_tuple
+
+
+
+    def run_expansions_parallel(self, seedSets, algorithm='naive'):
+        self.rid_to_idx, self.idx_to_rid = self.create_reaction_dicts()
+        self.cid_to_idx, self.idx_to_cid = self.create_compound_dicts()
+        R, P = self.create_RP_from_irreversible_network()
+        b = np.sum(R, axis=0)
+
+        R = csr_matrix(R)
+        P = csr_matrix(P)
+        b = csr_matrix(b)
+        b = b.transpose()
+
+        compoundScopes = []
+        reactionScopes = []
+
+        #with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+
+            results = executor.map(expansion_helper, [(self,seedSet, algorithm, R, P, b) for seedSet in seedSets])
+
+        for compounds, reactions in results:
+            compoundScopes.append(compounds)
+            reactionScopes.append(reactions)
+
+        return compoundScopes, reactionScopes
+
+
+    def run_expansions_reactionMasks_parallel(self, seedSet, maskedReactionSets):
+        R, P = self.create_RP_from_irreversible_network()
+        b = np.sum(R, axis=0)
+
+        R = csr_matrix(R)
+        P = csr_matrix(P)
+        b = csr_matrix(b)
+        b = b.transpose()
+
+        compoundScopes = []
+        reactionScopes = []
+
+        with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+            results = executor.map(expansion_helper_reaction_masks, [(self, seedSet, rxns_removed, R, P, b) for rxns_removed in maskedReactionSets])
+
+        for compounds, reactions in results:
+            compoundScopes.append(compounds)
+            reactionScopes.append(reactions)
+
+        return compoundScopes, reactionScopes
+
+
+# define an example helper function for parrellel execution of netowrk expansion code
+def expansion_helper(args):
+    instance, seedSet, algorithm, R, P, b = args
+    x0 = instance.initialize_metabolite_vector(seedSet)
+    x0 = csr_matrix(x0)
+    x0 = x0.transpose()
+
+    if algorithm.lower() == 'naive':
+        x, y = netExp(R, P, x0, b)
+        if x.toarray().sum() > 0:
+            cidx = np.nonzero(x.toarray().T[0])[0]
+            compounds = [instance.idx_to_cid[i] for i in cidx]
+        else:
+            compounds = []
+
+        if y.toarray().sum() > 0:
+            ridx = np.nonzero(y.toarray().T[0])[0]
+            reactions = [instance.idx_to_rid[i] for i in ridx]
+        else:
+            reactions = []
+
+    elif algorithm.lower() == 'trace':
+        X, Y = netExp_trace(R, P, x0, b)  # Assuming this function is already defined
+        compounds = instance.create_iteration_dict(X, instance.idx_to_cid)
+        reactions = instance.create_iteration_dict(Y, instance.idx_to_rid)
+    else:
+        raise ValueError('please define algorithm (trace or naive)')
+
+    return compounds, reactions
+
+# define an example helper function for parrellel execution of network expansion with reaction masks
+def expansion_helper_reaction_masks(args):
+    instance, seedSet, rxns_removed, R, P, b = args
+    x0 = instance.initialize_metabolite_vector(seedSet)
+    x0 = csr_matrix(x0)
+    x0 = x0.transpose()
+
+    yextinct = instance.initialize_reaction_vector(rxns_removed)
+    reaction_mask = csr_matrix(np.diag(1 - yextinct))
+    Pstar = P * reaction_mask
+    Rstar = R * reaction_mask
+
+    x, y = netExp(Rstar, Pstar, x0, b)
+
+    if x.toarray().sum() > 0:
+        cidx = np.nonzero(x.toarray().T[0])[0]
+        compounds = [instance.idx_to_cid[i] for i in cidx]
+    else:
+        compounds = []
+
+    if y.toarray().sum() > 0:
+        ridx = np.nonzero(y.toarray().T[0])[0]
+        reactions = [instance.idx_to_rid[i] for i in ridx]
+    else:
+        reactions = []
+
+    return compounds, reactions
+
+
     
