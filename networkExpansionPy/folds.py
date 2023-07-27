@@ -644,9 +644,8 @@ class FoldMetabolism:
         remaining_folds = set(self.scope.folds - current.folds)
 
         if len(remaining_folds) == 0:
-            next_foldset = frozenset()
-            max_effects[next_foldset] = deepcopy(current)
-            print("No folds remaining.")
+            print("No foldsets remaining.")
+            return frozenset(), {frozenset():deepcopy(current)}
             
         else:
             next_foldset = random.choice(list(remaining_folds)) ## this will be a single fold; can't sample from set
@@ -654,11 +653,9 @@ class FoldMetabolism:
             effects = Params()
             effects.folds = current.folds | set(next_foldset)
             effects.cpds, effects.rns = self.fold_expand(effects.folds, current.cpds)
-            effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
-            
-            max_effects[next_foldset] = {next_foldset:effects} ## to mimic the structure of max_effects
+            effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns)
 
-        return next_foldset, max_effects
+            return next_foldset, {next_foldset:effects} ## to mimic the structure of max_effects
 
     def choose_next_foldset(self, algorithm, size2foldsets, current, debug=False, ordered_outcome=False, ignore_reaction_versions=False):
         """
@@ -699,8 +696,7 @@ class FoldMetabolism:
         elif algorithm=="random_fold_order":
             ## loop_through function not needed in this case
             ## size2foldsets; ordered_outcome also unused
-            max_effects = 
-            next_foldset, max_effects = self.choose_next_foldset_random()
+            next_foldset, max_effects = self.choose_next_foldset_random(current)
 
         else:
             raise(ValueError("algorithm not found."))
