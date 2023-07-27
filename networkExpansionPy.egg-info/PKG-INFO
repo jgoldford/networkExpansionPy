@@ -1,10 +1,7 @@
-Metadata-Version: 1.0
+Metadata-Version: 2.1
 Name: networkExpansionPy
 Version: 0.0
 Summary: Python package containing algorithms for simulating the expansion of metabolic networks
 Home-page: https://github.com/jgoldford/networkExpansionPy/
 Author: Joshua E. Goldford
 Author-email: goldford.joshua@gmail.com
-License: UNKNOWN
-Description: UNKNOWN
-Platform: UNKNOWN

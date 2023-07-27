@@ -12,7 +12,7 @@ import warnings
 unittest.defaultTestLoader.sortTestMethodsUsing = lambda *args: -1 ## run tests in order defined within this file
 random.seed(3141)
 
-# from pandas.testing import assert_frame_equal
+from pandas.testing import assert_frame_equal
 
 class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
 
@@ -465,6 +465,31 @@ class TestGlobalFoldNetworkReal(unittest.TestCase):
     #     self.assertEqual(len(result.rns),len(self.fm.scope.rns))
     #     self.assertEqual(len(result.rules),len(self.fm.scope.rules))
     #     self.assertEqual(len(result.folds),len(self.fm.scope.folds))
+
+class TestParams(unittest.TestCase):
+
+    maxDiff = None ## allows full output of failed test differences
+
+    def test_get_versionless_reactions(self):
+        test_reactions = [
+            'photosyn_R09503_vX',
+            'R00430_gGTP_v2',
+            'R00430_gGTP_v1',
+            'R04591_gATP_v1',
+            'R00430_gGTP',
+            'R00430_vATP_v1',
+            'R00430_v1_extra',
+            'R00430_vATP']
+
+        expected_reactions = {
+            'R00430', 
+            'R00430_gGTP', 
+            'R00430_vATP', 
+            'R04591_gATP', 
+            'photosyn_R09503_vX'}
+
+        self.assertEqual(expected_reactions, nf.get_versionless_reactions(test_reactions))
+
 
 #### Tests to add
 # - test ordering of rules when there's an overlap with seed folds

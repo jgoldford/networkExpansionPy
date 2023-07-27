@@ -6,8 +6,19 @@ from pprint import pprint
 from datetime import datetime
 import random
 import pickle
+import re
 
 asset_path = PurePath(__file__).parent / "assets"
+
+def get_versionless_reactions(reactions):
+    versionless_reactions = list()
+    for i in reactions:
+        match = re.match(r'(.+)_v\d', i)
+        if match!=None:
+            versionless_reactions.append(match[1])
+        else:
+            versionless_reactions.append(i)
+    return set(versionless_reactions)
 
 class ImmutableParams:
     """
@@ -460,7 +471,7 @@ class FoldMetabolism:
 
         return size2foldsets
 
-    def loop_through_remaining_foldsets_no_look_ahead(self, size2foldsets, current, key_to_maximize, debug=False, ordered_outcome=False):
+    def loop_through_remaining_foldsets_no_look_ahead(self, size2foldsets, current, key_to_maximize, debug=False, ordered_outcome=False, ignore_reaction_versions=False):
         """
         Loop through remaining foldsets with no look-ahead, returning the foldset(s) that maximize the given key.
         
@@ -490,7 +501,11 @@ class FoldMetabolism:
             foldset2key_count = dict() ## key_to_maximize
             for foldset in size2foldsets[size]:
                 _foldset_rules = possible_next_rules.subset_from_folds(current.folds | foldset)
-                foldset2key_count[foldset] = len(getattr(_foldset_rules, key_to_maximize))
+
+                if key_to_maximize == "rns" and ignore_reaction_versions:
+                    foldset2key_count[foldset] = len(get_versionless_reactions(_foldset_rules.rns))
+                else:
+                    foldset2key_count[foldset] = len(getattr(_foldset_rules, key_to_maximize))
             
             max_v = max(foldset2key_count.values()) # should always be > 0 due to len(rule_options) check above
             max_foldsets = [k for k, v in foldset2key_count.items() if v==max_v]
@@ -500,7 +515,7 @@ class FoldMetabolism:
         
         return max_foldsets
 
-    def loop_through_remaining_foldsets_look_ahead(self, size2foldsets, current, key_to_maximize, debug=False):
+    def loop_through_remaining_foldsets_look_ahead(self, size2foldsets, current, key_to_maximize, debug=False, ignore_reaction_versions=False):
         """
         Loop through remaining foldsets with look-ahead, returning the foldset(s) that maximize the given key.
         
@@ -532,8 +547,10 @@ class FoldMetabolism:
                 effects.cpds, effects.rns = self.fold_expand(effects.folds, current.cpds)
                 effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
 
-                n_new = len(getattr(effects, key_to_maximize)) - len(getattr(current, key_to_maximize))
-                n_new_set = len(set(getattr(effects, key_to_maximize)) - set(getattr(current, key_to_maximize)))
+                if key_to_maximize == "rns" and ignore_reaction_versions:
+                    n_new_set = len(get_versionless_reactions(effects.rns) - get_versionless_reactions(current.rns))
+                else:
+                    n_new_set = len(set(getattr(effects, key_to_maximize)) - set(getattr(current, key_to_maximize)))
 
                 if debug:
                     print("size: ", size)
@@ -547,13 +564,13 @@ class FoldMetabolism:
                     print("cpd_current - cpd_effects: ", set(current.cpds) - set(effects.cpds))
                     print("max_v: ", max_v)
                     print("max_v foldsets: ", max_effects.keys())
-                    print("n_new / n_new_set: ", n_new, n_new_set)
+                    print("n_new_set: ", n_new_set)
                     print("~"*40)
 
-                if n_new == max_v:
+                if n_new_set == max_v:
                     max_effects[foldset] = effects
-                elif n_new > max_v:
-                    max_v = n_new
+                elif n_new_set > max_v:
+                    max_v = n_new_set
                     max_effects = dict()
                     max_effects[foldset] = effects
                 else: # n_new < max_v
@@ -623,7 +640,7 @@ class FoldMetabolism:
                 next_foldset = frozenset(random.choice(foldset_tuples)) ## change back to frozenset
         return next_foldset, max_effects #[next_foldset]
 
-    def choose_next_foldset(self, algorithm, size2foldsets, current, debug=False, ordered_outcome=False):
+    def choose_next_foldset(self, algorithm, size2foldsets, current, debug=False, ordered_outcome=False, ignore_reaction_versions=False):
         """
         Given the current foldset, choose the next foldset to expand using the specified algorithm.
 
@@ -652,11 +669,11 @@ class FoldMetabolism:
         }
         
         if algorithm in look_ahead_algorithms:
-            max_effects = self.loop_through_remaining_foldsets_look_ahead(size2foldsets, current, look_ahead_algorithms[algorithm], debug=debug)
+            max_effects = self.loop_through_remaining_foldsets_look_ahead(size2foldsets, current, look_ahead_algorithms[algorithm], debug=debug, ignore_reaction_versions=ignore_reaction_versions)
             next_foldset, max_effects = self.choose_next_foldset_look_ahead(current, max_effects, ordered_outcome)
 
         elif algorithm in no_look_ahead_algorithms:
-            max_foldsets = self.loop_through_remaining_foldsets_no_look_ahead(size2foldsets, current, no_look_ahead_algorithms[algorithm], debug=debug, ordered_outcome=ordered_outcome)
+            max_foldsets = self.loop_through_remaining_foldsets_no_look_ahead(size2foldsets, current, no_look_ahead_algorithms[algorithm], debug=debug, ordered_outcome=ordered_outcome, ignore_reaction_versions=ignore_reaction_versions)
             next_foldset, max_effects = self.choose_next_foldset_no_look_ahead(current, max_foldsets, ordered_outcome)
 
         else:
@@ -694,7 +711,7 @@ class FoldMetabolism:
         else:
             return True
 
-    def rule_order(self, algorithm, write=False, path=None, str_to_append_to_fname=None, debug=False, ordered_outcome=False):
+    def rule_order(self, algorithm, write=False, path=None, str_to_append_to_fname=None, debug=False, ordered_outcome=False, ignore_reaction_versions=False):
         """
         Determine the ordering of all rules/folds.
 
@@ -728,7 +745,7 @@ class FoldMetabolism:
         ## ITERATION 2+
         while keep_going:
             size2foldsets = self.sort_remaining_foldsets_by_size(current.folds)
-            next_foldset, max_effects = self.choose_next_foldset(algorithm, size2foldsets, current, debug=debug, ordered_outcome=ordered_outcome)
+            next_foldset, max_effects = self.choose_next_foldset(algorithm, size2foldsets, current, debug=debug, ordered_outcome=ordered_outcome, ignore_reaction_versions=ignore_reaction_versions)
             effects = max_effects[next_foldset]
 
             if len(next_foldset)==0:
@@ -762,6 +779,7 @@ def example_main():
     CUSTOM_WRITE_PATH = None # if writing result, custom path to write to
     STR_TO_APPEND_TO_FNAME = "EXAMPLE" # if writing result, str to append to filename
     ORDERED_OUTCOME = False # ignore random seed and always choose folds based on sort order
+    IGNORE_REACTION_VERSIONS = True # when maximizing for reactions, don't count versioned reactions
     METABOLISM_PATH = PurePath(asset_path, "metabolic_networks","metabolism.23Aug2022.pkl") # path to metabolism object pickle
     RN2RULES_PATH = PurePath(asset_path,"rn2fold","rn2rules.20230224.pkl") # path to rn2rules object pickle
     SEED_CPDS_PATH = PurePath(asset_path, "compounds", "seeds.Goldford2022.csv") # path to seed compounds csv
@@ -808,5 +826,5 @@ def example_main():
     ## Inititalize fold metabolism
     fm = nf.FoldMetabolism(metabolism, foldrules, seed)
     ## Run fold expansion
-    result = fm.rule_order(algorithm=ALGORITHM, write=WRITE, path=CUSTOM_WRITE_PATH, str_to_append_to_fname=STR_TO_APPEND_TO_FNAME, ordered_outcome=ORDERED_OUTCOME)
+    result = fm.rule_order(algorithm=ALGORITHM, write=WRITE, path=CUSTOM_WRITE_PATH, str_to_append_to_fname=STR_TO_APPEND_TO_FNAME, ordered_outcome=ORDERED_OUTCOME, ignore_reaction_versions=IGNORE_REACTION_VERSIONS)
     
