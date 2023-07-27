@@ -629,9 +629,9 @@ class FoldMetabolism:
             - Dictionary containing the effects of the expansion on the model, where each key is a frozenset object representing a foldset, and the corresponding value is a Params object representing the updated model state.
         """
         if len(max_effects) == 0:
-                next_foldset = frozenset()
-                max_effects[next_foldset] = deepcopy(current)
-                print("No foldsets remaining.")
+            next_foldset = frozenset()
+            max_effects[next_foldset] = deepcopy(current)
+            print("No foldsets remaining.")
         else:
             foldset_tuples = sorted([sorted(tuple(i)) for i in max_effects.keys()]) ## cast as tuples for predictable sorting
             if ordered_outcome:
