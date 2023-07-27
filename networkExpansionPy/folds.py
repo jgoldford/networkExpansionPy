@@ -640,6 +640,26 @@ class FoldMetabolism:
                 next_foldset = frozenset(random.choice(foldset_tuples)) ## change back to frozenset
         return next_foldset, max_effects #[next_foldset]
 
+    def choose_next_foldset_random(self, current):
+        remaining_folds = set(self.scope.folds - current.folds)
+
+        if len(remaining_folds) == 0:
+            next_foldset = frozenset()
+            max_effects[next_foldset] = deepcopy(current)
+            print("No folds remaining.")
+            
+        else:
+            next_foldset = random.choice(list(remaining_folds)) ## this will be a single fold; can't sample from set
+            ## Do expansion
+            effects = Params()
+            effects.folds = current.folds | set(next_foldset)
+            effects.cpds, effects.rns = self.fold_expand(effects.folds, current.cpds)
+            effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
+            
+            max_effects[next_foldset] = {next_foldset:effects} ## to mimic the structure of max_effects
+
+        return next_foldset, max_effects
+
     def choose_next_foldset(self, algorithm, size2foldsets, current, debug=False, ordered_outcome=False, ignore_reaction_versions=False):
         """
         Given the current foldset, choose the next foldset to expand using the specified algorithm.
@@ -676,6 +696,12 @@ class FoldMetabolism:
             max_foldsets = self.loop_through_remaining_foldsets_no_look_ahead(size2foldsets, current, no_look_ahead_algorithms[algorithm], debug=debug, ordered_outcome=ordered_outcome, ignore_reaction_versions=ignore_reaction_versions)
             next_foldset, max_effects = self.choose_next_foldset_no_look_ahead(current, max_foldsets, ordered_outcome)
 
+        elif algorithm=="random_fold_order":
+            ## loop_through function not needed in this case
+            ## size2foldsets; ordered_outcome also unused
+            max_effects = 
+            next_foldset, max_effects = self.choose_next_foldset_random()
+
         else:
             raise(ValueError("algorithm not found."))
 
@@ -706,6 +732,11 @@ class FoldMetabolism:
         elif algorithm in ["look_ahead_cpds", "no_look_ahead_cpds"]:
             if set(self.scope.cpds).issubset(set(current.cpds)):
                 print("Reached scope compounds.")
+                return False
+
+        elif algorithm in ["random_fold_order"]:
+            if set(self.scope.folds).issubset(set(current.folds)):
+                print("Reached scope folds.")
                 return False
 
         else:
