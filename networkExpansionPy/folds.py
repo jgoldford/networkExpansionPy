@@ -642,13 +642,14 @@ class FoldMetabolism:
 
     def choose_next_foldset_random(self, current):
         remaining_folds = set(self.scope.folds) - set(current.folds)
+        print(len(remaining_folds))
 
         if len(remaining_folds) == 0:
             print("No foldsets remaining.")
             return frozenset(), {frozenset():deepcopy(current)}
             
         else:
-            next_foldset = random.choice(list(remaining_folds)) ## this will be a single fold; can't sample from set
+            next_foldset = frozenset([random.choice(list(remaining_folds))]) ## this will be a single fold; can't sample from set
             ## Do expansion
             effects = Params()
             effects.folds = current.folds | set(next_foldset)
