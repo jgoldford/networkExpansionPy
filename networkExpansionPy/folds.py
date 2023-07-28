@@ -6,6 +6,7 @@ from pprint import pprint
 from datetime import datetime
 import random
 import pickle
+import gzip
 import re
 
 asset_path = PurePath(__file__).parent / "assets"
@@ -183,9 +184,9 @@ class Result:
 
     def get_path(self, path=None, str_to_append_to_fname=None):
         if str_to_append_to_fname == None:
-            fname = self.start_datetime+".pkl"
+            fname = self.start_datetime+".pkl.gz"
         else:
-            fname = self.start_datetime+"_"+str_to_append_to_fname+".pkl"
+            fname = self.start_datetime+"_"+str_to_append_to_fname+".pkl.gz"
         
         if path==None:
             path = Path.joinpath(Path.cwd(), "fold_results", fname)
@@ -200,7 +201,7 @@ class Result:
         path = self.get_path(path, str_to_append_to_fname)
         path = Path.joinpath(path.parent, path.stem+"_tmp"+path.suffix)
         path.parent.mkdir(parents=True, exist_ok=True) 
-        with open(path, 'wb') as handle:
+        with gzip.open(path, 'wb') as handle:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
         
         if self.temp_path == None:
@@ -217,7 +218,7 @@ class Result:
             i+=1
 
         path.parent.mkdir(parents=True, exist_ok=True) 
-        with open(path, 'wb') as handle:
+        with gzip.open(path, 'wb') as handle:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         self.final_path = str(path)
