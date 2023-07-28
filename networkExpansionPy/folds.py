@@ -649,7 +649,8 @@ class FoldMetabolism:
             return frozenset(), {frozenset():deepcopy(current)}
             
         else:
-            next_foldset = frozenset([random.choice(list(remaining_folds))]) ## this will be a single fold; can't sample from set
+            next_foldset = frozenset([random.choice(sorted(remaining_folds))]) ## this will be a single fold; can't sample from set
+            print(next_foldset)
             ## Do expansion
             effects = Params()
             effects.folds = current.folds | set(next_foldset)
