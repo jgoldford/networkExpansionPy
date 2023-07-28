@@ -758,7 +758,7 @@ class FoldMetabolism:
         ## Place to store results and current state of expansion
         ## ITERATION 0 (Avoid updating folds on the 0th iteration since they don't apply until iteration=1)
         result = Result()
-        current = Params(folds=self.seed.folds, cpds=self.seed.cpds, rns=self.seed.rns, rules=self.scope.rules.subset_from_folds(self.seed.folds).subset_from_rns(self.seed.rns))
+        current = Params(folds=self.seed.folds, cpds=self.seed.cpds, rns=set(), rules=self.scope.rules.subset_from_folds(self.seed.folds).subset_from_rns(self.seed.rns))
         metadata = Metadata()
         result.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
