@@ -641,7 +641,7 @@ class FoldMetabolism:
         return next_foldset, max_effects #[next_foldset]
 
     def choose_next_foldset_random(self, current):
-        remaining_folds = set(self.scope.folds - current.folds)
+        remaining_folds = set(self.scope.folds) - set(current.folds)
 
         if len(remaining_folds) == 0:
             print("No foldsets remaining.")
