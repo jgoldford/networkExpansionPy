@@ -1,7 +1,6 @@
 from scipy.sparse import csr_matrix
 import numpy as np
 import pandas as pd
-from random import sample
 import os
 import json
 from copy import copy, deepcopy

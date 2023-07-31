@@ -6,6 +6,7 @@ from pprint import pprint
 from datetime import datetime
 import random
 import pickle
+import gzip
 import re
 
 asset_path = PurePath(__file__).parent / "assets"
@@ -183,9 +184,9 @@ class Result:
 
     def get_path(self, path=None, str_to_append_to_fname=None):
         if str_to_append_to_fname == None:
-            fname = self.start_datetime+".pkl"
+            fname = self.start_datetime+".pkl.gz"
         else:
-            fname = self.start_datetime+"_"+str_to_append_to_fname+".pkl"
+            fname = self.start_datetime+"_"+str_to_append_to_fname+".pkl.gz"
         
         if path==None:
             path = Path.joinpath(Path.cwd(), "fold_results", fname)
@@ -200,7 +201,7 @@ class Result:
         path = self.get_path(path, str_to_append_to_fname)
         path = Path.joinpath(path.parent, path.stem+"_tmp"+path.suffix)
         path.parent.mkdir(parents=True, exist_ok=True) 
-        with open(path, 'wb') as handle:
+        with gzip.open(path, 'wb') as handle:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
         
         if self.temp_path == None:
@@ -217,7 +218,7 @@ class Result:
             i+=1
 
         path.parent.mkdir(parents=True, exist_ok=True) 
-        with open(path, 'wb') as handle:
+        with gzip.open(path, 'wb') as handle:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         self.final_path = str(path)
@@ -629,9 +630,9 @@ class FoldMetabolism:
             - Dictionary containing the effects of the expansion on the model, where each key is a frozenset object representing a foldset, and the corresponding value is a Params object representing the updated model state.
         """
         if len(max_effects) == 0:
-                next_foldset = frozenset()
-                max_effects[next_foldset] = deepcopy(current)
-                print("No foldsets remaining.")
+            next_foldset = frozenset()
+            max_effects[next_foldset] = deepcopy(current)
+            print("No foldsets remaining.")
         else:
             foldset_tuples = sorted([sorted(tuple(i)) for i in max_effects.keys()]) ## cast as tuples for predictable sorting
             if ordered_outcome:
@@ -639,6 +640,24 @@ class FoldMetabolism:
             else:
                 next_foldset = frozenset(random.choice(foldset_tuples)) ## change back to frozenset
         return next_foldset, max_effects #[next_foldset]
+
+    def choose_next_foldset_random(self, current):
+        remaining_folds = set(self.scope.folds) - set(current.folds)
+        print(len(remaining_folds))
+
+        if len(remaining_folds) == 0:
+            print("No foldsets remaining.")
+            return frozenset(), {frozenset():deepcopy(current)}
+            
+        else:
+            next_foldset = frozenset([random.choice(sorted(remaining_folds))]) ## this will be a single fold; can't sample from set
+            ## Do expansion
+            effects = Params()
+            effects.folds = current.folds | set(next_foldset)
+            effects.cpds, effects.rns = self.fold_expand(effects.folds, current.cpds)
+            effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns)
+
+            return next_foldset, {next_foldset:effects} ## to mimic the structure of max_effects
 
     def choose_next_foldset(self, algorithm, size2foldsets, current, debug=False, ordered_outcome=False, ignore_reaction_versions=False):
         """
@@ -676,6 +695,11 @@ class FoldMetabolism:
             max_foldsets = self.loop_through_remaining_foldsets_no_look_ahead(size2foldsets, current, no_look_ahead_algorithms[algorithm], debug=debug, ordered_outcome=ordered_outcome, ignore_reaction_versions=ignore_reaction_versions)
             next_foldset, max_effects = self.choose_next_foldset_no_look_ahead(current, max_foldsets, ordered_outcome)
 
+        elif algorithm=="random_fold_order":
+            ## loop_through function not needed in this case
+            ## size2foldsets; ordered_outcome also unused
+            next_foldset, max_effects = self.choose_next_foldset_random(current)
+
         else:
             raise(ValueError("algorithm not found."))
 
@@ -708,6 +732,11 @@ class FoldMetabolism:
                 print("Reached scope compounds.")
                 return False
 
+        elif algorithm in ["random_fold_order"]:
+            if set(self.scope.folds).issubset(set(current.folds)):
+                print("Reached scope folds.")
+                return False
+
         else:
             return True
 
@@ -729,7 +758,7 @@ class FoldMetabolism:
         ## Place to store results and current state of expansion
         ## ITERATION 0 (Avoid updating folds on the 0th iteration since they don't apply until iteration=1)
         result = Result()
-        current = Params(folds=self.seed.folds, cpds=self.seed.cpds, rns=self.seed.rns, rules=self.scope.rules.subset_from_folds(self.seed.folds).subset_from_rns(self.seed.rns))
+        current = Params(folds=self.seed.folds, cpds=self.seed.cpds, rns=set(), rules=self.scope.rules.subset_from_folds(self.seed.folds).subset_from_rns(self.seed.rns))
         metadata = Metadata()
         result.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
