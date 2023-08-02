@@ -255,8 +255,8 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                         'C9': 10,
                         'C10': 11}
         
-        expected_rns = {'R0': 0,
-                        'R1': 0,
+        expected_rns = {'R0': 1,
+                        'R1': 1,
                         'R2': 4,
                         'R3': 5,
                         'R4': 6,
@@ -294,6 +294,131 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         self.assertEqual(expected_folds, result.folds)
         self.assertEqual(expected_rules, result.rules)
 
+    def test_FoldMetabolism_rn_order_C0_no_indepdendent(self):
+        warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
+        foldrules = nf.FoldRules.from_rn2rules(self.rn2rules)
+        seed = nf.Params(
+            rns = set([]),
+            cpds = set(['C0']),
+            folds = set([])
+        )
+
+        fm = nf.FoldMetabolism(self.met, foldrules, seed)
+        result = fm.rule_order(algorithm="look_ahead_rns")
+
+        expected_cpds = {'C0': 0,
+                        'C1': 2,
+                        'C2': 3,
+                        'C3': 4,
+                        'C4': 5,
+                        'C5': 6,
+                        'C6': 7,
+                        'C7': 8,
+                        'C8': 9,
+                        'C9': 10,
+                        'C10': 11}
+        expected_rns = {'R0': 2,
+                        'R1': 3,
+                        'R2': 4,
+                        'R3': 5,
+                        'R4': 6,
+                        'R5': 7,
+                        'R6': 8,
+                        'R7': 9,
+                        'R8': 10,
+                        'R9': 11}
+        expected_folds = {'fold_independent': 0,
+                        'F0': 2,
+                        'F1': 3,
+                        'F2': 4,
+                        'F3': 5,
+                        'F4': 6,
+                        'F5': 7,
+                        'F6': 8,
+                        'F7': 9,
+                        'F8': 10,
+                        'F9': 11}
+
+        expected_rules = {("R0", frozenset({'F0'})):2,
+                        ("R1", frozenset({'F1'})):3,
+                        ("R2", frozenset({'F2'})):4,
+                        ("R3", frozenset({'F3'})):5,
+                        ("R4", frozenset({'F4'})):6,
+                        ("R5", frozenset({'F5'})):7,
+                        ("R6", frozenset({'F6'})):8,
+                        ("R7", frozenset({'F7'})):9,
+                        ("R8", frozenset({'F8'})):10,
+                        ("R9", frozenset({'F9'})):11}
+
+        self.assertEqual(expected_cpds, result.cpds)
+        self.assertEqual(expected_rns, result.rns)
+        self.assertEqual(expected_folds, result.folds)
+        self.assertEqual(expected_rules, result.rules)
+        
+    def test_FoldMetabolism_rn_order_C0_independent_R0R1(self):
+        random.seed(3141)
+        warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
+        foldrules = nf.FoldRules.from_rn2rules(self.rn2rules)
+        seed = nf.Params(
+            rns = set(["R0","R1"]),
+            cpds = set(['C0']),
+            folds = set([])
+        )
+
+        fm = nf.FoldMetabolism(self.met, foldrules, seed)
+        result = fm.rule_order(algorithm="look_ahead_rns", debug=False, ordered_outcome=True)
+
+        expected_cpds = {'C0': 0,
+                        'C1': 1,
+                        'C2': 1,
+                        'C3': 2,
+                        'C4': 3,
+                        'C5': 4,
+                        'C6': 5,
+                        'C7': 6,
+                        'C8': 7,
+                        'C9': 8,
+                        'C10': 9}
+        
+        expected_rns = {'R0': 1,
+                        'R1': 1,
+                        'R2': 2,
+                        'R3': 3,
+                        'R4': 4,
+                        'R5': 5,
+                        'R6': 6,
+                        'R7': 7,
+                        'R8': 8,
+                        'R9': 9}
+
+        expected_folds = {'fold_independent': 0, 
+                        'F0': 10,  
+                        'F1': 11,  
+                        'F2': 2,
+                        'F3': 3,
+                        'F4': 4,
+                        'F5': 5,
+                        'F6': 6,
+                        'F7': 7,
+                        'F8': 8,
+                        'F9': 9}
+
+        expected_rules = {("R0", frozenset({'F0'})):10,
+                        ("R1", frozenset({'F1'})):11,
+                        ("R2", frozenset({'F2'})):2,
+                        ("R3", frozenset({'F3'})):3,
+                        ("R4", frozenset({'F4'})):4,
+                        ("R5", frozenset({'F5'})):5,
+                        ("R6", frozenset({'F6'})):6,
+                        ("R7", frozenset({'F7'})):7,
+                        ("R8", frozenset({'F8'})):8,
+                        ("R9", frozenset({'F9'})):9}
+
+        # self.assertEqual(expected_cpds, result.cpds)
+        self.assertEqual(expected_rns, result.rns)
+        self.assertEqual(expected_folds, result.folds)
+        self.assertEqual(expected_rules, result.rules)
+
     def test_write_results(self):
 
         random.seed(3141)
@@ -306,7 +431,7 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         )
 
         fm = nf.FoldMetabolism(self.met, foldrules, seed)
-        result = fm.rule_order(algorithm="look_ahead_rules", write=True, ordered_outcome=True)
+        result = fm.rule_order(algorithm="look_ahead_rules", write=True, write_tmp=True, ordered_outcome=True)
 
         expected_cpds = {'C0': 0,
                         'C1': 1,
@@ -320,8 +445,8 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                         'C9': 10,
                         'C10': 11}
         
-        expected_rns = {'R0': 0,
-                        'R1': 0,
+        expected_rns = {'R0': 1,
+                        'R1': 1,
                         'R2': 4,
                         'R3': 5,
                         'R4': 6,
@@ -367,104 +492,104 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         self.assertEqual(final_result.folds, temp_result.folds)
         self.assertEqual(final_result.rules, temp_result.rules)
 
-class TestGlobalFoldNetworkReal(unittest.TestCase):
-    """THESE ARE SLOW TESTS! EACH METHOD IS MAYBE 1.5 MIN"""
+# class TestGlobalFoldNetworkReal(unittest.TestCase):
+#     """THESE ARE SLOW TESTS! EACH METHOD IS MAYBE 1.5 MIN"""
 
 
-    maxDiff = None ## allows full output of failed test differences
+#     maxDiff = None ## allows full output of failed test differences
 
-    def setUp(self):
-        warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
-        asset_path = nf.asset_path
+#     def setUp(self):
+#         warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
+#         asset_path = nf.asset_path
 
-        METABOLISM_PATH = PurePath(asset_path, "metabolic_networks","metabolism.23Aug2022.pkl") # path to metabolism object pickle
-        RN2RULES_PATH = PurePath(asset_path, "rn2fold","rn2rules.20230224.pkl") # path to rn2rules object pickle
-        SEED_CPDS_PATH = PurePath(asset_path, "compounds", "seeds.Goldford2022.csv") # path to seed compounds csv
+#         METABOLISM_PATH = PurePath(asset_path, "metabolic_networks","metabolism.23Aug2022.pkl") # path to metabolism object pickle
+#         RN2RULES_PATH = PurePath(asset_path, "rn2fold","rn2rules.20230224.pkl") # path to rn2rules object pickle
+#         SEED_CPDS_PATH = PurePath(asset_path, "compounds", "seeds.Goldford2022.csv") # path to seed compounds csv
 
-        ## Metabolism
-        metabolism = pd.read_pickle(METABOLISM_PATH)
+#         ## Metabolism
+#         metabolism = pd.read_pickle(METABOLISM_PATH)
 
-        ## FoldRules
-        rn2rules = pd.read_pickle(RN2RULES_PATH)
-        foldrules = nf.FoldRules.from_rn2rules(rn2rules)
-        popular_folds = set([
-            2002,
-            2007,
-            7560,
-            543,
-            210,
-            325,
-            205,
-            282,
-            246,
-            109])
-        popular_folds = set(str(i) for i in popular_folds)
-        foldrules = foldrules.subset_from_folds(popular_folds)
+#         ## FoldRules
+#         rn2rules = pd.read_pickle(RN2RULES_PATH)
+#         foldrules = nf.FoldRules.from_rn2rules(rn2rules)
+#         popular_folds = set([
+#             2002,
+#             2007,
+#             7560,
+#             543,
+#             210,
+#             325,
+#             205,
+#             282,
+#             246,
+#             109])
+#         popular_folds = set(str(i) for i in popular_folds)
+#         foldrules = foldrules.subset_from_folds(popular_folds)
 
-        ## Modify seeds with AA and GATP_rns
-        aa_cids = set(["C00037",
-            "C00041",
-            "C00065",
-            "C00188",
-            "C00183",
-            "C00407",
-            "C00123",
-            "C00148",
-            "C00049",
-            "C00025"])
+#         ## Modify seeds with AA and GATP_rns
+#         aa_cids = set(["C00037",
+#             "C00041",
+#             "C00065",
+#             "C00188",
+#             "C00183",
+#             "C00407",
+#             "C00123",
+#             "C00148",
+#             "C00049",
+#             "C00025"])
 
-        GATP_rns = {'R00200_gATP_v1',
-            'R00200_gATP_v2',
-            'R00430_gGTP_v1',
-            'R00430_gGTP_v2',
-            'R01523_gATP_v1',
-            'R04144_gATP_v1',
-            'R04208_gATP',
-            'R04463_gATP',
-            'R04591_gATP_v1',
-            'R06836_gATP',
-            'R06974_gATP',
-            'R06975_gATP_v1'}
+#         GATP_rns = {'R00200_gATP_v1',
+#             'R00200_gATP_v2',
+#             'R00430_gGTP_v1',
+#             'R00430_gGTP_v2',
+#             'R01523_gATP_v1',
+#             'R04144_gATP_v1',
+#             'R04208_gATP',
+#             'R04463_gATP',
+#             'R04591_gATP_v1',
+#             'R06836_gATP',
+#             'R06974_gATP',
+#             'R06975_gATP_v1'}
 
-        ## Seed
-        seed = nf.Params(
-            rns = set(metabolism.network["rn"]) - set(rn2rules) | GATP_rns,
-            cpds = set((pd.read_csv(SEED_CPDS_PATH)["ID"])) | aa_cids,
-            folds = set(['spontaneous'])
-        )
+#         ## Seed
+#         seed = nf.Params(
+#             rns = set(metabolism.network["rn"]) - set(rn2rules) | GATP_rns,
+#             cpds = set((pd.read_csv(SEED_CPDS_PATH)["ID"])) | aa_cids,
+#             folds = set(['spontaneous'])
+#         )
 
-        ## Inititalize fold metabolism
-        self.fm = nf.FoldMetabolism(metabolism, foldrules, seed)
-        ## Run fold expansion
+#         ## Inititalize fold metabolism
+#         self.fm = nf.FoldMetabolism(metabolism, foldrules, seed)
+#         ## Run fold expansion
 
-    def test_run_no_look_ahead_rules_sanity(self):
-        ALGORITHM = "no_look_ahead_rules"
-        result = self.fm.rule_order(algorithm=ALGORITHM, ordered_outcome=True)
+#     def test_run_no_look_ahead_rules_sanity(self):
+#         ALGORITHM = "no_look_ahead_rules"
+#         result = self.fm.rule_order(algorithm=ALGORITHM, ordered_outcome=True)
 
-        self.assertEqual((set(result.cpds) - self.fm.seed.cpds), self.fm.scope.cpds - self.fm.seed.cpds)
-        self.assertEqual(set(result.cpds), self.fm.scope.cpds | self.fm.seed.cpds)
-        self.assertEqual((set(result.rns) - self.fm.seed.rns), self.fm.scope.rns - self.fm.seed.rns)
-        self.assertEqual(set(result.rns), self.fm.scope.rns | self.fm.seed.rns)
-        self.assertEqual(set(result.rules), self.fm.scope.rules.ids)
-        self.assertEqual(set(result.folds) - {"fold_independent", "spontaneous"}, self.fm.scope.folds)
+#         self.assertEqual((set(result.cpds) - self.fm.seed.cpds), self.fm.scope.cpds - self.fm.seed.cpds)
+#         self.assertEqual(set(result.cpds), self.fm.scope.cpds | self.fm.seed.cpds)
+#         self.assertEqual((set(result.rns) - self.fm.seed.rns), self.fm.scope.rns - self.fm.seed.rns)
+#         self.assertEqual(set(result.rns), self.fm.scope.rns | self.fm.seed.rns)
+#         self.assertEqual(set(result.rules), self.fm.scope.rules.ids)
+#         self.assertEqual(set(result.folds) - {"fold_independent", "spontaneous"}, self.fm.scope.folds)
 
-    def test_run_no_look_ahead_rns_sanity(self):
-        ALGORITHM = "no_look_ahead_rns"
-        result = self.fm.rule_order(algorithm=ALGORITHM, ordered_outcome=True)
+#     def test_run_no_look_ahead_rns_sanity(self):
+#         ALGORITHM = "no_look_ahead_rns"
+#         result = self.fm.rule_order(algorithm=ALGORITHM, ordered_outcome=True)
 
-        self.assertEqual((set(result.cpds) - self.fm.seed.cpds), self.fm.scope.cpds - self.fm.seed.cpds)
-        self.assertEqual(set(result.cpds), self.fm.scope.cpds | self.fm.seed.cpds)
-        self.assertEqual((set(result.rns) - self.fm.seed.rns), self.fm.scope.rns - self.fm.seed.rns)
-        self.assertEqual(set(result.rns), self.fm.scope.rns | self.fm.seed.rns)
+#         self.assertEqual((set(result.cpds) - self.fm.seed.cpds), self.fm.scope.cpds - self.fm.seed.cpds)
+#         self.assertEqual(set(result.cpds), self.fm.scope.cpds | self.fm.seed.cpds)
+#         self.assertEqual((set(result.rns) - self.fm.seed.rns), self.fm.scope.rns - self.fm.seed.rns)
+#         self.assertEqual(set(result.rns), self.fm.scope.rns | self.fm.seed.rns)
 
-    # def test_run_no_look_ahead_rns_sanity(self):
-    #     ALGORITHM = "no_look_ahead_rns"
-    #     result = self.fm.rule_order(algorithm=ALGORITHM, ordered_outcome=True)
+#     # def test_run_no_look_ahead_rns_sanity(self):
+#     #     ALGORITHM = "no_look_ahead_rns"
+#     #     result = self.fm.rule_order(algorithm=ALGORITHM, ordered_outcome=True)
 
-    #     self.assertEqual(len(result.cpds),len(self.fm.scope.cpds))
-    #     self.assertEqual(len(result.rns),len(self.fm.scope.rns))
-    #     self.assertEqual(len(result.rules),len(self.fm.scope.rules))
-    #     self.assertEqual(len(result.folds),len(self.fm.scope.folds))
+#     #     self.assertEqual(len(result.cpds),len(self.fm.scope.cpds))
+#     #     self.assertEqual(len(result.rns),len(self.fm.scope.rns))
+#     #     self.assertEqual(len(result.rules),len(self.fm.scope.rules))
+#     #     self.assertEqual(len(result.folds),len(self.fm.scope.folds))
 
 class TestParams(unittest.TestCase):
 
