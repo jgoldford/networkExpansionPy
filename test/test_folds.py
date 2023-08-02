@@ -492,6 +492,19 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         self.assertEqual(final_result.folds, temp_result.folds)
         self.assertEqual(final_result.rules, temp_result.rules)
 
+        fm = nf.FoldMetabolism(self.met, foldrules, seed)
+        result = fm.rule_order(algorithm="look_ahead_rules", write=True, write_tmp=False, ordered_outcome=True)
+
+        final_result = pd.read_pickle(result.final_path)
+
+        self.assertEqual(final_result.cpds, expected_cpds)
+        self.assertEqual(final_result.rns, expected_rns)
+        self.assertEqual(final_result.folds, expected_folds)
+        self.assertEqual(final_result.rules, expected_rules)
+
+        with self.assertRaises(ValueError):
+            pd.read_pickle(result.temp_path)
+
 # class TestGlobalFoldNetworkReal(unittest.TestCase):
 #     """THESE ARE SLOW TESTS! EACH METHOD IS MAYBE 1.5 MIN"""
 
