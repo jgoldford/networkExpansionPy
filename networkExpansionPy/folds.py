@@ -740,7 +740,7 @@ class FoldMetabolism:
         else:
             return True
 
-    def rule_order(self, algorithm, write=False, path=None, str_to_append_to_fname=None, debug=False, ordered_outcome=False, ignore_reaction_versions=False):
+    def rule_order(self, algorithm, write=False, write_tmp=False, path=None, str_to_append_to_fname=None, debug=False, ordered_outcome=False, ignore_reaction_versions=False):
         """
         Determine the ordering of all rules/folds.
 
@@ -760,12 +760,12 @@ class FoldMetabolism:
         result = Result()
         current = Params(folds=self.seed.folds, cpds=self.seed.cpds, rns=set(), rules=self.scope.rules.subset_from_folds(self.seed.folds).subset_from_rns(self.seed.rns))
         metadata = Metadata()
-        result.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
+        result.first_update(current, write=write_tmp, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
         ## ITERATION 1 (using only seed folds and fold independent reactions)
         current.cpds, current.rns = self.fold_expand(current.folds, current.cpds)
         current.rules = self.scope.rules.subset_from_folds(current.folds).subset_from_rns(current.rns)
-        result.update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
+        result.update(current, write=write_tmp, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
         ## Needed in case expansion not possible at all
         keep_going = self.keep_going(algorithm, current)
@@ -790,7 +790,7 @@ class FoldMetabolism:
                 metadata.size2foldsets = size2foldsets
 
             ## Store when cpds and rns appear in the expansion
-            result.update(current, metadata=metadata, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
+            result.update(current, metadata=metadata, write=write_tmp, path=path, str_to_append_to_fname=str_to_append_to_fname)
             print("="*60)
             print("rule iter: {} ({:.2} sec) {}".format(result.iteration, result.iteration_time[result.iteration], next_foldset))
             print("="*60)
@@ -805,6 +805,7 @@ def example_main():
 
     ALGORITHM = "no_look_ahead_rules"
     WRITE = True # write result to disk
+    WRITE_TMP = TRUE # write after each iteration
     CUSTOM_WRITE_PATH = None # if writing result, custom path to write to
     STR_TO_APPEND_TO_FNAME = "EXAMPLE" # if writing result, str to append to filename
     ORDERED_OUTCOME = False # ignore random seed and always choose folds based on sort order
@@ -855,5 +856,5 @@ def example_main():
     ## Inititalize fold metabolism
     fm = nf.FoldMetabolism(metabolism, foldrules, seed)
     ## Run fold expansion
-    result = fm.rule_order(algorithm=ALGORITHM, write=WRITE, path=CUSTOM_WRITE_PATH, str_to_append_to_fname=STR_TO_APPEND_TO_FNAME, ordered_outcome=ORDERED_OUTCOME, ignore_reaction_versions=IGNORE_REACTION_VERSIONS)
+    result = fm.rule_order(algorithm=ALGORITHM, write=WRITE, write_tmp=WRITE_TMP, path=CUSTOM_WRITE_PATH, str_to_append_to_fname=STR_TO_APPEND_TO_FNAME, ordered_outcome=ORDERED_OUTCOME, ignore_reaction_versions=IGNORE_REACTION_VERSIONS)
     
