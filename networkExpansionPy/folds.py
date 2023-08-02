@@ -805,7 +805,7 @@ def example_main():
 
     ALGORITHM = "no_look_ahead_rules"
     WRITE = True # write result to disk
-    WRITE_TMP = TRUE # write after each iteration
+    WRITE_TMP = True # write after each iteration
     CUSTOM_WRITE_PATH = None # if writing result, custom path to write to
     STR_TO_APPEND_TO_FNAME = "EXAMPLE" # if writing result, str to append to filename
     ORDERED_OUTCOME = False # ignore random seed and always choose folds based on sort order
