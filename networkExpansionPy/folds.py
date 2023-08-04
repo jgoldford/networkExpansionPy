@@ -28,10 +28,12 @@ class ImmutableParams:
     After initialization attributes are immutable, to avoid unintentionally changing parameters like the seed or scope.
     """
 
-    def __init__(self, folds=None, cpds=None, rns=None, rules=None):
+    def __init__(self, folds=None, cpds=None, cpd_iteration_dict=None, rns=None, rn_iteration_dict=None, rules=None):
         self._folds = deepcopy(folds)
         self._cpds = deepcopy(cpds)
+        self._cpd_iteration_dict = deepcopy(cpd_iteration_dict)
         self._rns = deepcopy(rns)
+        self._rn_iteration_dict = deepcopy(rn_iteration_dict)
         self._rules = deepcopy(rules)
 
     @property
@@ -43,8 +45,16 @@ class ImmutableParams:
         return self._cpds
 
     @property
+    def cpd_iteration_dict(self):
+        return self._cpd_iteration_dict
+
+    @property
     def rns(self):
         return self._rns
+
+    @property
+    def rn_iteration_dict(self):
+        return self._rn_iteration_dict
 
     @property
     def rules(self):
@@ -65,9 +75,17 @@ class Params(ImmutableParams):
     def cpds(self, value):
         self._cpds = deepcopy(value)
 
+    @ImmutableParams.cpd_iteration_dict.setter
+    def cpd_iteration_dict(self, value):
+        self._cpd_iteration_dict = deepcopy(value)
+
     @ImmutableParams.rns.setter
     def rns(self, value):
         self._rns = deepcopy(value)
+
+    @ImmutableParams.rn_iteration_dict.setter
+    def rn_iteration_dict(self, value):
+        self._rn_iteration_dict = deepcopy(value)
 
     @ImmutableParams.rules.setter
     def rules(self, value):
@@ -419,7 +437,7 @@ class FoldMetabolism:
         print("...done.")
         return ImmutableParams(folds=scope.folds, rns=scope.rns, rules=scope.rules, cpds=scope.cpds)
 
-    def fold_expand(self, folds, current_cpds, fold_algorithm="naive"):
+    def fold_expand(self, folds, current_cpds, fold_algorithm="trace"):
         """
         Expand the given set of compounds and rules using the specified fold algorithm and a subset of the rules based on the given folds.
 
@@ -436,8 +454,8 @@ class FoldMetabolism:
 
         possible_rules = self.f.subset_from_folds(folds)
         rn_tup_set = set(self.m.rxns2tuple(possible_rules.rns | self.seed.rns))
-        cx,rx = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, reaction_mask=rn_tup_set)
-        return set(cx), set([i[0] for i in rx])
+        compound_iteration_dict, reaction_iteration_dict = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, reaction_mask=rn_tup_set)
+        return compound_iteration_dict, reaction_iteration_dict#set(cx), set([i[0] for i in rx])
 
     def sort_remaining_foldsets_by_size(self, current_folds):
         """
@@ -492,7 +510,8 @@ class FoldMetabolism:
             raise(ValueError("It doesn't make sense to choose a fold which maximizes number of folds."))
 
         one_step_effects = Params()
-        one_step_effects.cpds, one_step_effects.rns = self.fold_expand(self.scope.folds, current.cpds, fold_algorithm="step")
+        one_step_effects.cpd_iteration_dict, one_step_effects.rn_iteration_dict = self.fold_expand(self.scope.folds, current.cpds, fold_algorithm="step")
+        one_step_effects.cpds, one_step_effects.rns = set(one_step_effects.cpd_iteration_dict.keys()), set(one_step_effects.rn_iteration_dict.keys())
 
         max_foldsets = list()
         for size in sorted(size2foldsets.keys()):
@@ -545,7 +564,8 @@ class FoldMetabolism:
                 effects = Params()
 
                 effects.folds = current.folds | set(foldset)
-                effects.cpds, effects.rns = self.fold_expand(effects.folds, current.cpds)
+                effects.cpd_iteration_dict, effects.rn_iteration_dict = self.fold_expand(effects.folds, current.cpds)
+                effects.cpds, effects.rns = set(effects.cpd_iteration_dict.keys()), set(effects.rn_iteration_dict.keys())
                 effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
 
                 if key_to_maximize == "rns" and ignore_reaction_versions:
@@ -606,7 +626,8 @@ class FoldMetabolism:
             ## Do expansion
             effects = Params()
             effects.folds = current.folds | set(next_foldset)
-            effects.cpds, effects.rns = self.fold_expand(effects.folds, current.cpds)
+            effects.cpd_iteration_dict, effects.rn_iteration_dict = self.fold_expand(effects.folds, current.cpds)
+            effects.cpds, effects.rns = set(effects.cpd_iteration_dict.keys()), set(effects.rn_iteration_dict.keys())
             effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
             
             return next_foldset, {next_foldset:effects} ## to mimic the structure of max_effects
@@ -654,7 +675,8 @@ class FoldMetabolism:
             ## Do expansion
             effects = Params()
             effects.folds = current.folds | set(next_foldset)
-            effects.cpds, effects.rns = self.fold_expand(effects.folds, current.cpds)
+            effects.cpd_iteration_dict, effects.rn_iteration_dict = self.fold_expand(effects.folds, current.cpds)
+            effects.cpds, effects.rns = set(effects.cpd_iteration_dict.keys()), set(effects.rn_iteration_dict.keys())
             effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns)
 
             return next_foldset, {next_foldset:effects} ## to mimic the structure of max_effects
@@ -763,7 +785,8 @@ class FoldMetabolism:
         result.first_update(current, write=write_tmp, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
         ## ITERATION 1 (using only seed folds and fold independent reactions)
-        current.cpds, current.rns = self.fold_expand(current.folds, current.cpds)
+        current.cpd_iteration_dict, current.rn_iteration_dict = self.fold_expand(current.folds, current.cpds)
+        current.cpds, current.rns = set(current.cpd_iteration_dict.keys()), set(current.rn_iteration_dict.keys())
         current.rules = self.scope.rules.subset_from_folds(current.folds).subset_from_rns(current.rns)
         result.update(current, write=write_tmp, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
