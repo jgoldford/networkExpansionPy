@@ -139,8 +139,13 @@ class Result:
 
     def __init__(self):
         self.iteration = 0
+        self.iteration_cum = 0
         self.cpds = dict()
         self.rns = dict()
+        self.cpds_subiter = dict()
+        self.rns_subiter = dict()
+        self.cpds_cumiter = dict()
+        self.rns_cumiter = dict()
         self.folds = {"fold_independent":0}
         self.rules = dict() # activated; not simply possible
         self.start_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -158,6 +163,7 @@ class Result:
         self.update_iteration_time()
         if write==True:
             self.temp_write(path=path, str_to_append_to_fname=str_to_append_to_fname)
+        self.update_iter_cum(current)
 
     def update(self, current, metadata=None, write=False, path=None, str_to_append_to_fname=None):
         self.update_iter()
@@ -172,11 +178,15 @@ class Result:
         for i in current.cpds:
             if i not in self.cpds:
                 self.cpds[i] = self.iteration
+                self.cpds_subiter[i] = current.cpd_iteration_dict[i]
+                self.cpds_cumiter[i] = self.iteration_cum + self.cpds_subiter[i]
 
     def update_rns(self, current):
         for i in current.rns:
             if i not in self.rns:
                 self.rns[i] = self.iteration
+                self.rns_subiter[i] = current.cpd_iteration_dict[i]
+                self.rns_cumiter[i] = self.iteration_cum + self.rns_subiter[i]
 
     def update_folds(self, current):
         for i in current.folds:
@@ -199,6 +209,9 @@ class Result:
 
     def update_iter(self):
         self.iteration+=1
+
+    def update_iter_cum(self, current):
+        self.iteration_cum += max(current.cpd_iteration_dict.values())
 
     def get_path(self, path=None, str_to_append_to_fname=None):
         if str_to_append_to_fname == None:
@@ -807,7 +820,9 @@ class FoldMetabolism:
                 ## Update folds, rules2rns available; Update rns in expansion, cpds in expansion
                 current.folds = (current.folds | set(next_foldset))
                 current.cpds = effects.cpds
+                current.cpd_iteration_dict = effects.cpd_iteration_dict
                 current.rns = effects.rns
+                current.rn_iteration_dict = effects.rn_iteration_dict
                 current.rules = self.scope.rules.subset_from_folds(current.folds).subset_from_rns(current.rns)
                 metadata.max_effects = max_effects
                 metadata.size2foldsets = size2foldsets
