@@ -176,16 +176,16 @@ class Result:
 
     def update_cpds(self, current):
         for i in current.cpds:
+            self.cpds_subiter[i] = current.cpd_iteration_dict[i]
             if i not in self.cpds:
                 self.cpds[i] = self.iteration
-                self.cpds_subiter[i] = current.cpd_iteration_dict[i]
                 self.cpds_cumiter[i] = self.iteration_cum + self.cpds_subiter[i]
 
     def update_rns(self, current):
         for i in current.rns:
+            self.rns_subiter[i] = current.cpd_iteration_dict[i]
             if i not in self.rns:
                 self.rns[i] = self.iteration
-                self.rns_subiter[i] = current.cpd_iteration_dict[i]
                 self.rns_cumiter[i] = self.iteration_cum + self.rns_subiter[i]
 
     def update_folds(self, current):
