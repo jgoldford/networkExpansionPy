@@ -140,11 +140,11 @@ class Result:
     def __init__(self):
         self.iteration = 0
         self.iteration_cum = 0
-        self.cpds = dict()
-        self.rns = dict()
+        self.cpds_folditer = dict()
         self.cpds_subiter = dict()
-        self.rns_subiter = dict()
         self.cpds_cumiter = dict()
+        self.rns_folditer = dict()
+        self.rns_subiter = dict()
         self.rns_cumiter = dict()
         self.folds = {"fold_independent":0}
         self.rules = dict() # activated; not simply possible
@@ -175,17 +175,17 @@ class Result:
         self.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
     def update_cpds(self, current):
+        self.cpds_subiter[i] = deepcopy(current.cpd_iteration_dict)
         for i in current.cpds:
-            self.cpds_subiter[i] = current.cpd_iteration_dict[i]
-            if i not in self.cpds:
-                self.cpds[i] = self.iteration
+            if i not in self.cpds_folditer:
+                self.cpds_folditer[i] = self.iteration
                 self.cpds_cumiter[i] = self.iteration_cum + self.cpds_subiter[i]
 
     def update_rns(self, current):
+        self.rns_subiter[i] = deepcopy(current.rn_iteration_dict)
         for i in current.rns:
-            self.rns_subiter[i] = current.cpd_iteration_dict[i]
-            if i not in self.rns:
-                self.rns[i] = self.iteration
+            if i not in self.rns_folditer:
+                self.rns_folditer[i] = self.iteration
                 self.rns_cumiter[i] = self.iteration_cum + self.rns_subiter[i]
 
     def update_folds(self, current):
