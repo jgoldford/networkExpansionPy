@@ -176,14 +176,18 @@ class Result:
         self.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
     def update_cpds(self, current):
-        self.cpds_subiter[self.iteration] = deepcopy(current.cpd_iteration_dict)
+        if len(set(current.cpd_iteration_dict.keys()) - set(self.cpds_folditer.keys())) != 0:
+            self.cpds_subiter[self.iteration] = deepcopy(current.cpd_iteration_dict)
+
         for i in current.cpds:
             if i not in self.cpds_folditer:
                 self.cpds_folditer[i] = self.iteration
                 self.cpds_cumiter[i] = self.iteration_cum + self.cpds_subiter[self.iteration][i]
 
     def update_rns(self, current):
-        self.rns_subiter[self.iteration] = deepcopy(current.rn_iteration_dict)
+        if len(set(current.rn_iteration_dict.keys()) - set(self.rns_folditer.keys())) != 0:
+            self.rns_subiter[self.iteration] = deepcopy(current.rn_iteration_dict)
+
         for i in current.rns:
             if i not in self.rns_folditer:
                 self.rns_folditer[i] = self.iteration
