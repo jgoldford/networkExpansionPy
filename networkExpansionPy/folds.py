@@ -137,7 +137,8 @@ class Result:
         final_write: Writes final results to a file.
     """
 
-    def __init__(self):
+    def __init__(self, scope):
+        self.scope = deepcopy(scope)
         self.iteration = 0
         self.iteration_cum = 0
         self.cpds_folditer = dict()
@@ -792,7 +793,7 @@ class FoldMetabolism:
         """
         ## Place to store results and current state of expansion
         ## ITERATION 0 (Avoid updating folds on the 0th iteration since they don't apply until iteration=1)
-        result = Result()
+        result = Result(self.scope)
         current = Params(folds=self.seed.folds, cpds=self.seed.cpds, rns=set(), rules=self.scope.rules.subset_from_folds(self.seed.folds).subset_from_rns(self.seed.rns))
         metadata = Metadata()
         result.first_update(current, write=write_tmp, path=path, str_to_append_to_fname=str_to_append_to_fname)
