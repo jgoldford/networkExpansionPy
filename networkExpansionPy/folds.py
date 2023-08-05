@@ -175,18 +175,18 @@ class Result:
         self.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
     def update_cpds(self, current):
-        self.cpds_subiter[i] = deepcopy(current.cpd_iteration_dict)
+        self.cpds_subiter[self.iteration] = deepcopy(current.cpd_iteration_dict)
         for i in current.cpds:
             if i not in self.cpds_folditer:
                 self.cpds_folditer[i] = self.iteration
-                self.cpds_cumiter[i] = self.iteration_cum + self.cpds_subiter[i]
+                self.cpds_cumiter[i] = self.iteration_cum + self.cpds_subiter[self.iteration][i]
 
     def update_rns(self, current):
-        self.rns_subiter[i] = deepcopy(current.rn_iteration_dict)
+        self.rns_subiter[self.iteration] = deepcopy(current.rn_iteration_dict)
         for i in current.rns:
             if i not in self.rns_folditer:
                 self.rns_folditer[i] = self.iteration
-                self.rns_cumiter[i] = self.iteration_cum + self.rns_subiter[i]
+                self.rns_cumiter[i] = self.iteration_cum + self.rns_subiter[self.iteration][i]
 
     def update_folds(self, current):
         for i in current.folds:
