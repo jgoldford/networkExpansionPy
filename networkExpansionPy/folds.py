@@ -795,6 +795,8 @@ class FoldMetabolism:
         ## ITERATION 0 (Avoid updating folds on the 0th iteration since they don't apply until iteration=1)
         result = Result(self.scope)
         current = Params(folds=self.seed.folds, cpds=self.seed.cpds, rns=set(), rules=self.scope.rules.subset_from_folds(self.seed.folds).subset_from_rns(self.seed.rns))
+        current.cpd_iteration_dict = {k:0 for k in current.cpds}
+        current.rn_iteration_dict = {}
         metadata = Metadata()
         result.first_update(current, write=write_tmp, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
