@@ -147,8 +147,11 @@ class Result:
         self.rns_folditer = dict()
         self.rns_subiter = dict()
         self.rns_cumiter = dict()
-        self.folds = {"fold_independent":0}
-        self.rules = dict() # activated; not simply possible
+        self.folds_folditer = {"fold_independent":0}
+        self.folds_cumiter = {"fold_independent":0}
+        # self.rules = dict() # activated; not simply possible
+        self.rules_folditer = dict()
+        self.rules_cumiter = dict()
         self.start_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.start_time = timeit.default_timer()
         self.iteration_time = dict()
@@ -195,13 +198,16 @@ class Result:
 
     def update_folds(self, current):
         for i in current.folds:
-            if i not in self.folds:
-                self.folds[i] = self.iteration
+            if i not in self.folds_folditer:
+                self.folds_folditer[i] = self.iteration
+                self.folds_cumiter[i] = self.iteration_cum+1 #+ self.rns_subiter[self.iteration][i]
 
     def update_rules(self, current):
         for i in current.rules.ids:
-            if i not in self.rules:
-                self.rules[i] = self.iteration
+            if i not in self.rules_folditer:
+                # self.rules[i] = self.iteration
+                self.rules_folditer[i] = self.iteration
+                self.rules_cumiter[i] = self.iteration_cum+1
 
     def update_iteration_time(self):
         self.iteration_time[self.iteration] =  timeit.default_timer() - self.start_time
