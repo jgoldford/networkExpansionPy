@@ -216,7 +216,8 @@ class Result:
         self.iteration+=1
 
     def update_iter_cum(self, current):
-        self.iteration_cum += max(current.cpd_iteration_dict.values())
+        if not len(current.rn_iteration_dict) == 0:
+            self.iteration_cum += max(current.rn_iteration_dict.values())
 
     def get_path(self, path=None, str_to_append_to_fname=None):
         if str_to_append_to_fname == None:
