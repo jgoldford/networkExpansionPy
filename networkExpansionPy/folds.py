@@ -560,7 +560,7 @@ class FoldMetabolism:
             
             max_v = max(foldset2key_count.values()) # should always be > 0 due to len(rule_options) check above
             max_foldsets = [k for k, v in foldset2key_count.items() if v==max_v]
-            max_foldset2key_counts = {k for k, v in foldset2key_count.items() if v==max_v}
+            max_foldset2key_counts = {k:v for k, v in foldset2key_count.items() if v==max_v}
 
             if len(max_foldsets)>0:
                 break
