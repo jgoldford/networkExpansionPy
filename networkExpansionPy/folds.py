@@ -560,11 +560,12 @@ class FoldMetabolism:
             
             max_v = max(foldset2key_count.values()) # should always be > 0 due to len(rule_options) check above
             max_foldsets = [k for k, v in foldset2key_count.items() if v==max_v]
+            max_foldset2key_counts = {k for k, v in foldset2key_count.items() if v==max_v}
 
             if len(max_foldsets)>0:
                 break
         
-        return max_foldsets
+        return max_foldset2key_counts #max_foldsets
 
     def loop_through_remaining_foldsets_look_ahead(self, size2foldsets, current, key_to_maximize, debug=False, ignore_reaction_versions=False):
         """
@@ -633,13 +634,13 @@ class FoldMetabolism:
                 break
         return max_effects
 
-    def choose_next_foldset_no_look_ahead(self, current, max_foldsets, ordered_outcome=False):
+    def choose_next_foldset_no_look_ahead(self, current, max_foldset2key_counts, ordered_outcome=False):
         """
         Given the current foldset, choose the next foldset to expand using the no-look-ahead algorithm.
 
         Args:
             current (Params): The current state of the fold expansion.
-            max_foldsets (list): List of frozenset objects representing the maximum effect foldsets to consider for expansion.
+            max_foldset2key_counts (list): List of frozenset objects representing the maximum effect foldsets to consider for expansion.
             ordered_outcome (bool): Whether to select the next foldset deterministically or randomly. (default:False)
 
         Returns:
@@ -647,8 +648,8 @@ class FoldMetabolism:
             - Next foldset to expand represented as a frozenset object.
             - Dictionary containing the effects of the expansion on the model, where each key is a frozenset object representing a foldset, and the corresponding value is a Params object representing the updated model state.
         """
-        if len(max_foldsets)>0:
-            foldset_tuples = sorted([sorted(tuple(i)) for i in max_foldsets]) ## cast as tuples for predictable sorting
+        if len(max_foldset2key_counts)>0:
+            foldset_tuples = sorted([sorted(tuple(i)) for i in max_foldset2key_counts]) ## cast as tuples for predictable sorting
             if ordered_outcome:
                 next_foldset = frozenset(foldset_tuples[0])
             else:
@@ -661,7 +662,8 @@ class FoldMetabolism:
             effects.cpds, effects.rns = set(effects.cpd_iteration_dict.keys()), set(effects.rn_iteration_dict.keys())
             effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
             
-            return next_foldset, {next_foldset:effects} ## to mimic the structure of max_effects
+            max_foldset2key_counts[next_foldset] = effects
+            return next_foldset, max_foldset2key_counts ## to mimic the structure of max_effects
 
         else:
             print("No foldsets remaining.")
@@ -745,8 +747,8 @@ class FoldMetabolism:
             next_foldset, max_effects = self.choose_next_foldset_look_ahead(current, max_effects, ordered_outcome)
 
         elif algorithm in no_look_ahead_algorithms:
-            max_foldsets = self.loop_through_remaining_foldsets_no_look_ahead(size2foldsets, current, no_look_ahead_algorithms[algorithm], debug=debug, ordered_outcome=ordered_outcome, ignore_reaction_versions=ignore_reaction_versions)
-            next_foldset, max_effects = self.choose_next_foldset_no_look_ahead(current, max_foldsets, ordered_outcome)
+            max_foldset2key_counts = self.loop_through_remaining_foldsets_no_look_ahead(size2foldsets, current, no_look_ahead_algorithms[algorithm], debug=debug, ordered_outcome=ordered_outcome, ignore_reaction_versions=ignore_reaction_versions)
+            next_foldset, max_effects = self.choose_next_foldset_no_look_ahead(current, max_foldset2key_counts, ordered_outcome)
 
         elif algorithm=="random_fold_order":
             ## loop_through function not needed in this case
