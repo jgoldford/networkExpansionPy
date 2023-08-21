@@ -412,11 +412,14 @@ class FoldMetabolism:
         seed (Params): a Params object that defines the initial compounds, folds, and reactions (these are fold independent reactions)
         """
 
-    def __init__(self, metabolism, foldrules, seed):#, preexpansion=False):        
+    def __init__(self, metabolism, foldrules, seed, scope=None):#, preexpansion=False):        
         self._m = metabolism ## GlobalMetabolicNetwork object
         self._f = foldrules # FoldRules object
         self._seed = ImmutableParams(folds=seed.folds, rns=seed.rns, cpds=seed.cpds) ## seed.rns == fold_independent_rns
-        self._scope = self.calculate_scope(seed)
+        if scope==None:
+            self._scope = self.calculate_scope(seed)
+        else:
+            self._scope = scope
 
     ## Disallow changing metabolism or foldrules after initialization b/c no setter
     @property 
