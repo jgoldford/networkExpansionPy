@@ -482,8 +482,12 @@ class FoldMetabolism:
 
         possible_rules = self.f.subset_from_folds(folds)
         rn_tup_set = set(self.m.rxns2tuple(possible_rules.rns | self.seed.rns))
-        compound_iteration_dict, reaction_iteration_dict = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, reaction_mask=rn_tup_set)
-        return compound_iteration_dict, {k[0]:v for k,v in reaction_iteration_dict.items()}#set(cx), set([i[0] for i in rx])
+        if fold_algorithm=="trace":
+            compound_iteration_dict, reaction_iteration_dict = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, reaction_mask=rn_tup_set)
+            return compound_iteration_dict, {k[0]:v for k,v in reaction_iteration_dict.items()}#set(cx), set([i[0] for i in rx])
+        elif fold_algorithm=="step":
+            cx,rx = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, reaction_mask=rn_tup_set)
+            return set(cx), set([i[0] for i in rx])
 
     def sort_remaining_foldsets_by_size(self, current_folds):
         """
@@ -538,8 +542,7 @@ class FoldMetabolism:
             raise(ValueError("It doesn't make sense to choose a fold which maximizes number of folds."))
 
         one_step_effects = Params()
-        one_step_effects.cpd_iteration_dict, one_step_effects.rn_iteration_dict = self.fold_expand(self.scope.folds, current.cpds, fold_algorithm="step")
-        one_step_effects.cpds, one_step_effects.rns = set(one_step_effects.cpd_iteration_dict.keys()), set(one_step_effects.rn_iteration_dict.keys())
+        one_step_effects.cpds, one_step_effects.rns = self.fold_expand(self.scope.folds, current.cpds, fold_algorithm="step")
 
         max_foldsets = list()
         for size in sorted(size2foldsets.keys()):
