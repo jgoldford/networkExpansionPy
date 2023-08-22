@@ -545,6 +545,7 @@ class FoldMetabolism:
         one_step_effects.cpds, one_step_effects.rns = self.fold_expand(self.scope.folds, current.cpds, fold_algorithm="step")
 
         max_foldsets = list()
+        max_foldset2key_counts = dict()
         for size in sorted(size2foldsets.keys()):
 
             possible_next_rules = self.scope.rules.remaining_rules(current.folds).subset_from_rns(one_step_effects.rns)
