@@ -542,20 +542,20 @@ class FoldMetabolism:
             raise(ValueError("It doesn't make sense to choose a fold which maximizes number of folds."))
 
         one_step_effects = Params()
-        one_step_effects.cpds, one_step_effects.rns = self.fold_expand(self.scope.folds, current.cpds, fold_algorithm="step")
+        one_step_effects.cpds, one_step_effects.rns = self.fold_expand(self.scope.folds, current.cpds, fold_algorithm="step") # if we had all folds active, what would the next iteration's cpds/rns be?
 
         max_foldsets = list()
         max_foldset2key_counts = dict()
         for size in sorted(size2foldsets.keys()):
 
-            possible_next_rules = self.scope.rules.remaining_rules(current.folds).subset_from_rns(one_step_effects.rns)
+            possible_next_rules = self.scope.rules.remaining_rules(current.folds).subset_from_rns(one_step_effects.rns) # which remaining rules map to reactions in the next step? (assuming we had all folds active)
 
             foldset2key_count = dict() ## key_to_maximize
             for foldset in size2foldsets[size]:
-                _foldset_rules = possible_next_rules.subset_from_folds(current.folds | foldset)
+                _foldset_rules = possible_next_rules.subset_from_folds(current.folds | foldset) # rules enabled after trialing the addition of a foldset
 
                 if key_to_maximize == "rns" and ignore_reaction_versions:
-                    foldset2key_count[foldset] = len(get_versionless_reactions(_foldset_rules.rns))
+                    foldset2key_count[foldset] = len(get_versionless_reactions(_foldset_rules.rns)) # the total number of reactions reachable if new rules were available. These reactions aren't necessarily going to be reached by the expansion with the currently available compounds. (is this how we should be counting?) 
                 else:
                     foldset2key_count[foldset] = len(getattr(_foldset_rules, key_to_maximize))
             
