@@ -14,12 +14,15 @@ asset_path = PurePath(__file__).parent / "assets"
 def get_versionless_reactions(reactions):
     versionless_reactions = list()
     for i in reactions:
-        match = re.match(r'(.+)_v\d', i)
-        if match!=None:
-            versionless_reactions.append(match[1])
-        else:
-            versionless_reactions.append(i)
+        versionless_reactions.append(get_versionless_reaction(i))
     return set(versionless_reactions)
+
+def get_versionless_reaction(reaction):
+    match = re.match(r'(.+)_v\d', reaction)
+    if match!=None:
+        return match[1]
+    else:
+        return reaction
 
 class ImmutableParams:
     """
@@ -288,6 +291,7 @@ class Rule:
 
     def __init__(self,rn,foldset:frozenset):
         self.rn = rn
+        self.rn_versionless = get_versionless_reaction(rn)
         self.foldset = foldset
         self.id = (rn, foldset)
 
@@ -377,6 +381,10 @@ class FoldRules:
         if self._ids == None:
             self._ids = set([r.id for r in self.rules])
         return self._ids
+
+    @property
+    def versionless(self):
+        return FoldRules([Rule(r.rn_versionless, r.foldset) for r in self.rules])
 
     def subset_from_rns(self, rns):
         return FoldRules([r for r in self.rules if r.rn in rns])
@@ -561,7 +569,7 @@ class FoldMetabolism:
             max_v = max(foldset2key_count.values()) # should always be > 0 due to len(rule_options) check above
             max_foldsets = [k for k, v in foldset2key_count.items() if v==max_v]
 
-            if len(max_foldsets)>0:
+            if len(max_v)>0:
                 break
         
         return max_foldsets
@@ -599,6 +607,15 @@ class FoldMetabolism:
                 effects.cpds, effects.rns = set(effects.cpd_iteration_dict.keys()), set(effects.rn_iteration_dict.keys())
                 effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
 
+                ######
+                _foldset_rules = possible_next_rules.subset_from_folds(current.folds | foldset)
+
+                if key_to_maximize == "rns" and ignore_reaction_versions:
+                    foldset2key_count[foldset] = len(get_versionless_reactions(_foldset_rules.rns))
+                else:
+                    foldset2key_count[foldset] = len(getattr(_foldset_rules, key_to_maximize))
+
+                ######
                 if key_to_maximize == "rns" and ignore_reaction_versions:
                     n_new_set = len(get_versionless_reactions(effects.rns) - get_versionless_reactions(current.rns))
                 else:
@@ -629,7 +646,7 @@ class FoldMetabolism:
                     pass
 
             ## Don't look for longer rules if shorter rules enable new reactions
-            if len(max_effects)>0:
+            if max_v>0:
                 break
         return max_effects
 
