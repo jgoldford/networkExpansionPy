@@ -552,6 +552,12 @@ class FoldMetabolism:
         one_step_effects = Params()
         one_step_effects.cpds, one_step_effects.rns = self.fold_expand(self.scope.folds, current.cpds, fold_algorithm="step")
 
+        ## Store current max value of key
+        if ignore_reaction_versions:
+            max_v_current = len(getattr(current.rules.versionless, key_to_maximize))
+        else:
+            max_v_current = len(getattr(current.rules, key_to_maximize))
+
         max_foldsets = list()
         for size in sorted(size2foldsets.keys()):
 
@@ -561,15 +567,15 @@ class FoldMetabolism:
             for foldset in size2foldsets[size]:
                 _foldset_rules = possible_next_rules.subset_from_folds(current.folds | foldset)
 
-                if key_to_maximize == "rns" and ignore_reaction_versions:
-                    foldset2key_count[foldset] = len(get_versionless_reactions(_foldset_rules.rns))
-                else:
-                    foldset2key_count[foldset] = len(getattr(_foldset_rules, key_to_maximize))
-            
-            max_v = max(foldset2key_count.values()) # should always be > 0 due to len(rule_options) check above
-            max_foldsets = [k for k, v in foldset2key_count.items() if v==max_v]
+                if ignore_reaction_versions:
+                    _foldset_rules = _foldset_rules.versionless
 
-            if len(max_v)>0:
+                foldset2key_count[foldset] = len(getattr(_foldset_rules, key_to_maximize))
+
+            max_v_newfoldset = max(foldset2key_count.values()) # should always be > 0 due to len(rule_options) check above
+            max_foldsets = [k for k, v in foldset2key_count.items() if v==max_v_newfoldset]
+
+            if len(max_v_newfoldset - max_v_current)>0:
                 break
         
         return max_foldsets
