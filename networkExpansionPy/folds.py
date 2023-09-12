@@ -633,13 +633,13 @@ class FoldMetabolism:
                     print("n_new_set: ", n_new_set)
                     print("~"*40)
 
-                if n_new_set == max_v:
+                if (n_new_set == max_v) and (max_v > 0):
                     max_effects[foldset] = effects
                 elif n_new_set > max_v:
                     max_v = n_new_set
                     max_effects = dict()
                     max_effects[foldset] = effects
-                else: # n_new < max_v
+                else: # n_new < max_v or n_new == max_v == 0
                     pass
 
             ## Don't look for longer rules if shorter rules enable new reactions
