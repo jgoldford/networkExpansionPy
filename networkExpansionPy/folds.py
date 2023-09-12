@@ -555,6 +555,7 @@ class FoldMetabolism:
         possible_next_rules = self.scope.rules.remaining_rules(current.folds).subset_from_rns(one_step_effects.rns)
 
         max_foldsets = list()
+        max_foldset2key_counts = dict()
         for size in sorted(size2foldsets.keys()):
 
             foldset2key_count = dict() ## key_to_maximize
@@ -568,6 +569,7 @@ class FoldMetabolism:
 
             max_v = max(foldset2key_count.values()) 
             max_foldsets = [k for k, v in foldset2key_count.items() if v==max_v and max_v>0]
+            max_foldset2key_counts = {k:v for k, v in foldset2key_count.items() if v==max_v and max_v>0}
             
             print("+++++++++++++++++")
             pprint(f"foldset2key_count: {foldset2key_count}")
@@ -576,7 +578,7 @@ class FoldMetabolism:
             if max_v>0:
                 break
         
-        return max_foldsets
+        return max_foldset2key_counts
 
     def loop_through_remaining_foldsets_look_ahead(self, size2foldsets, current, key_to_maximize, debug=False, ignore_reaction_versions=False):
         """
