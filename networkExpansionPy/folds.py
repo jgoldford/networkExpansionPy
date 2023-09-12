@@ -611,17 +611,19 @@ class FoldMetabolism:
                 effects.cpds, effects.rns = set(effects.cpd_iteration_dict.keys()), set(effects.rn_iteration_dict.keys())
                 effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
 
-                ######
+
+
                 _foldset_rules = possible_next_rules.subset_from_folds(current.folds | foldset)
 
-                if key_to_maximize == "rns" and ignore_reaction_versions:
-                    foldset2key_count[foldset] = len(get_versionless_reactions(_foldset_rules.rns))
-                else:
-                    foldset2key_count[foldset] = len(getattr(_foldset_rules, key_to_maximize))
+                if ignore_reaction_versions:
+                    _foldset_rules = _foldset_rules.versionless
 
-                ######
+
+
                 if key_to_maximize == "rns" and ignore_reaction_versions:
                     n_new_set = len(get_versionless_reactions(effects.rns) - get_versionless_reactions(current.rns))
+                elif key_to_maximize == "rules" and ignore_reaction_versions:
+                    n_new_set = len(effects.rules.versionless - current.rules.versionless)
                 else:
                     n_new_set = len(set(getattr(effects, key_to_maximize)) - set(getattr(current, key_to_maximize)))
 
