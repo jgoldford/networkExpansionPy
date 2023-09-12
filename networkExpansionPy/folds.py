@@ -557,7 +557,7 @@ class FoldMetabolism:
         max_foldsets = list()
         max_foldset2key_counts = dict()
         for size in sorted(size2foldsets.keys()):
-            
+
             foldset2key_count = dict() ## key_to_maximize
             for foldset in size2foldsets[size]:
                 _foldset_rules = possible_next_rules.subset_from_folds(current.folds | foldset) # rules enabled after trialing the addition of a foldset
@@ -616,7 +616,7 @@ class FoldMetabolism:
                 if key_to_maximize == "rns" and ignore_reaction_versions:
                     n_new_set = len(get_versionless_reactions(effects.rns) - get_versionless_reactions(current.rns))
                 elif key_to_maximize == "rules" and ignore_reaction_versions:
-                    n_new_set = len(effects.rules.versionless - current.rules.versionless)
+                    n_new_set = len(set(effects.rules.versionless) - set(current.rules.versionless))
                 else:
                     n_new_set = len(set(getattr(effects, key_to_maximize)) - set(getattr(current, key_to_maximize)))
 
