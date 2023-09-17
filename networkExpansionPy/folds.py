@@ -412,11 +412,14 @@ class FoldMetabolism:
         seed (Params): a Params object that defines the initial compounds, folds, and reactions (these are fold independent reactions)
         """
 
-    def __init__(self, metabolism, foldrules, seed):#, preexpansion=False):        
+    def __init__(self, metabolism, foldrules, seed, scope=None):#, preexpansion=False):        
         self._m = metabolism ## GlobalMetabolicNetwork object
         self._f = foldrules # FoldRules object
         self._seed = ImmutableParams(folds=seed.folds, rns=seed.rns, cpds=seed.cpds) ## seed.rns == fold_independent_rns
-        self._scope = self.calculate_scope(seed)
+        if scope==None:
+            self._scope = self.calculate_scope(seed)
+        else:
+            self._scope = scope
 
     ## Disallow changing metabolism or foldrules after initialization b/c no setter
     @property 
@@ -479,8 +482,12 @@ class FoldMetabolism:
 
         possible_rules = self.f.subset_from_folds(folds)
         rn_tup_set = set(self.m.rxns2tuple(possible_rules.rns | self.seed.rns))
-        compound_iteration_dict, reaction_iteration_dict = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, reaction_mask=rn_tup_set)
-        return compound_iteration_dict, {k[0]:v for k,v in reaction_iteration_dict.items()}#set(cx), set([i[0] for i in rx])
+        if fold_algorithm=="trace":
+            compound_iteration_dict, reaction_iteration_dict = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, reaction_mask=rn_tup_set)
+            return compound_iteration_dict, {k[0]:v for k,v in reaction_iteration_dict.items()}#set(cx), set([i[0] for i in rx])
+        elif fold_algorithm=="step":
+            cx,rx = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, reaction_mask=rn_tup_set)
+            return set(cx), set([i[0] for i in rx])
 
     def sort_remaining_foldsets_by_size(self, current_folds):
         """
@@ -535,30 +542,31 @@ class FoldMetabolism:
             raise(ValueError("It doesn't make sense to choose a fold which maximizes number of folds."))
 
         one_step_effects = Params()
-        one_step_effects.cpd_iteration_dict, one_step_effects.rn_iteration_dict = self.fold_expand(self.scope.folds, current.cpds, fold_algorithm="step")
-        one_step_effects.cpds, one_step_effects.rns = set(one_step_effects.cpd_iteration_dict.keys()), set(one_step_effects.rn_iteration_dict.keys())
+        one_step_effects.cpds, one_step_effects.rns = self.fold_expand(self.scope.folds, current.cpds, fold_algorithm="step") # if we had all folds active, what would the next iteration's cpds/rns be?
 
         max_foldsets = list()
+        max_foldset2key_counts = dict()
         for size in sorted(size2foldsets.keys()):
 
-            possible_next_rules = self.scope.rules.remaining_rules(current.folds).subset_from_rns(one_step_effects.rns)
+            possible_next_rules = self.scope.rules.remaining_rules(current.folds).subset_from_rns(one_step_effects.rns) # which remaining rules map to reactions in the next step? (assuming we had all folds active)
 
             foldset2key_count = dict() ## key_to_maximize
             for foldset in size2foldsets[size]:
-                _foldset_rules = possible_next_rules.subset_from_folds(current.folds | foldset)
+                _foldset_rules = possible_next_rules.subset_from_folds(current.folds | foldset) # rules enabled after trialing the addition of a foldset
 
                 if key_to_maximize == "rns" and ignore_reaction_versions:
-                    foldset2key_count[foldset] = len(get_versionless_reactions(_foldset_rules.rns))
+                    foldset2key_count[foldset] = len(get_versionless_reactions(_foldset_rules.rns)) # the total number of reactions reachable if new rules were available. These reactions aren't necessarily going to be reached by the expansion with the currently available compounds. (is this how we should be counting?) 
                 else:
                     foldset2key_count[foldset] = len(getattr(_foldset_rules, key_to_maximize))
             
             max_v = max(foldset2key_count.values()) # should always be > 0 due to len(rule_options) check above
             max_foldsets = [k for k, v in foldset2key_count.items() if v==max_v]
+            max_foldset2key_counts = {k:v for k, v in foldset2key_count.items() if v==max_v}
 
             if len(max_foldsets)>0:
                 break
         
-        return max_foldsets
+        return max_foldset2key_counts #max_foldsets
 
     def loop_through_remaining_foldsets_look_ahead(self, size2foldsets, current, key_to_maximize, debug=False, ignore_reaction_versions=False):
         """
@@ -627,13 +635,13 @@ class FoldMetabolism:
                 break
         return max_effects
 
-    def choose_next_foldset_no_look_ahead(self, current, max_foldsets, ordered_outcome=False):
+    def choose_next_foldset_no_look_ahead(self, current, max_foldset2key_counts, ordered_outcome=False):
         """
         Given the current foldset, choose the next foldset to expand using the no-look-ahead algorithm.
 
         Args:
             current (Params): The current state of the fold expansion.
-            max_foldsets (list): List of frozenset objects representing the maximum effect foldsets to consider for expansion.
+            max_foldset2key_counts (list): List of frozenset objects representing the maximum effect foldsets to consider for expansion.
             ordered_outcome (bool): Whether to select the next foldset deterministically or randomly. (default:False)
 
         Returns:
@@ -641,8 +649,8 @@ class FoldMetabolism:
             - Next foldset to expand represented as a frozenset object.
             - Dictionary containing the effects of the expansion on the model, where each key is a frozenset object representing a foldset, and the corresponding value is a Params object representing the updated model state.
         """
-        if len(max_foldsets)>0:
-            foldset_tuples = sorted([sorted(tuple(i)) for i in max_foldsets]) ## cast as tuples for predictable sorting
+        if len(max_foldset2key_counts)>0:
+            foldset_tuples = sorted([sorted(tuple(i)) for i in max_foldset2key_counts]) ## cast as tuples for predictable sorting
             if ordered_outcome:
                 next_foldset = frozenset(foldset_tuples[0])
             else:
@@ -655,7 +663,8 @@ class FoldMetabolism:
             effects.cpds, effects.rns = set(effects.cpd_iteration_dict.keys()), set(effects.rn_iteration_dict.keys())
             effects.rules = self.f.subset_from_folds(effects.folds).subset_from_rns(effects.rns) ## this could include many unreachable rules because we never restricted ourselves to the present folds!
             
-            return next_foldset, {next_foldset:effects} ## to mimic the structure of max_effects
+            max_foldset2key_counts[next_foldset] = effects
+            return next_foldset, max_foldset2key_counts ## to mimic the structure of max_effects
 
         else:
             print("No foldsets remaining.")
@@ -739,8 +748,8 @@ class FoldMetabolism:
             next_foldset, max_effects = self.choose_next_foldset_look_ahead(current, max_effects, ordered_outcome)
 
         elif algorithm in no_look_ahead_algorithms:
-            max_foldsets = self.loop_through_remaining_foldsets_no_look_ahead(size2foldsets, current, no_look_ahead_algorithms[algorithm], debug=debug, ordered_outcome=ordered_outcome, ignore_reaction_versions=ignore_reaction_versions)
-            next_foldset, max_effects = self.choose_next_foldset_no_look_ahead(current, max_foldsets, ordered_outcome)
+            max_foldset2key_counts = self.loop_through_remaining_foldsets_no_look_ahead(size2foldsets, current, no_look_ahead_algorithms[algorithm], debug=debug, ordered_outcome=ordered_outcome, ignore_reaction_versions=ignore_reaction_versions)
+            next_foldset, max_effects = self.choose_next_foldset_no_look_ahead(current, max_foldset2key_counts, ordered_outcome)
 
         elif algorithm=="random_fold_order":
             ## loop_through function not needed in this case
