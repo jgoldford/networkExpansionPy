@@ -14,12 +14,15 @@ asset_path = PurePath(__file__).parent / "assets"
 def get_versionless_reactions(reactions):
     versionless_reactions = list()
     for i in reactions:
-        match = re.match(r'(.+)_v\d', i)
-        if match!=None:
-            versionless_reactions.append(match[1])
-        else:
-            versionless_reactions.append(i)
+        versionless_reactions.append(get_versionless_reaction(i))
     return set(versionless_reactions)
+
+def get_versionless_reaction(reaction):
+    match = re.match(r'(.+)_v\d', reaction)
+    if match!=None:
+        return match[1]
+    else:
+        return reaction
 
 class ImmutableParams:
     """
@@ -234,7 +237,7 @@ class Result:
         if path==None:
             path = Path.joinpath(Path.cwd(), "fold_results", fname)
         else:
-            path = Path.joinpath(path, "fold_results", fname)
+            path = Path.joinpath(Path(path), "fold_results", fname)
 
         return path
 
@@ -256,15 +259,16 @@ class Result:
         path = self.get_path(path, str_to_append_to_fname)
         
         i = 0
-        while path.is_file():
-            path = Path.joinpath(path.parent, path.stem+"_"+str(i)+path.suffix)
+        newpath = path
+        while newpath.is_file():
+            newpath = Path.joinpath(path.parent, path.name.removesuffix(".pkl.gz")+"_"+str(i)+".pkl.gz")
             i+=1
 
-        path.parent.mkdir(parents=True, exist_ok=True) 
-        with gzip.open(path, 'wb') as handle:
+        newpath.parent.mkdir(parents=True, exist_ok=True) 
+        with gzip.open(newpath, 'wb') as handle:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        self.final_path = str(path)
+        self.final_path = str(newpath)
         print("Final results written to:\n{}".format(self.final_path))
 
 class Rule:
@@ -288,6 +292,7 @@ class Rule:
 
     def __init__(self,rn,foldset:frozenset):
         self.rn = rn
+        self.rn_versionless = get_versionless_reaction(rn)
         self.foldset = foldset
         self.id = (rn, foldset)
 
@@ -377,6 +382,10 @@ class FoldRules:
         if self._ids == None:
             self._ids = set([r.id for r in self.rules])
         return self._ids
+
+    @property
+    def versionless(self):
+        return FoldRules([Rule(r.rn_versionless, r.foldset) for r in self.rules])
 
     def subset_from_rns(self, rns):
         return FoldRules([r for r in self.rules if r.rn in rns])
@@ -542,31 +551,35 @@ class FoldMetabolism:
             raise(ValueError("It doesn't make sense to choose a fold which maximizes number of folds."))
 
         one_step_effects = Params()
-        one_step_effects.cpds, one_step_effects.rns = self.fold_expand(self.scope.folds, current.cpds, fold_algorithm="step") # if we had all folds active, what would the next iteration's cpds/rns be?
+        one_step_effects.cpds, one_step_effects.rns = self.fold_expand(self.scope.folds, current.cpds, fold_algorithm="step")
+
+        possible_next_rules = self.scope.rules.remaining_rules(current.folds).subset_from_rns(one_step_effects.rns)
 
         max_foldsets = list()
         max_foldset2key_counts = dict()
         for size in sorted(size2foldsets.keys()):
 
-            possible_next_rules = self.scope.rules.remaining_rules(current.folds).subset_from_rns(one_step_effects.rns) # which remaining rules map to reactions in the next step? (assuming we had all folds active)
-
             foldset2key_count = dict() ## key_to_maximize
             for foldset in size2foldsets[size]:
                 _foldset_rules = possible_next_rules.subset_from_folds(current.folds | foldset) # rules enabled after trialing the addition of a foldset
 
-                if key_to_maximize == "rns" and ignore_reaction_versions:
-                    foldset2key_count[foldset] = len(get_versionless_reactions(_foldset_rules.rns)) # the total number of reactions reachable if new rules were available. These reactions aren't necessarily going to be reached by the expansion with the currently available compounds. (is this how we should be counting?) 
-                else:
-                    foldset2key_count[foldset] = len(getattr(_foldset_rules, key_to_maximize))
-            
-            max_v = max(foldset2key_count.values()) # should always be > 0 due to len(rule_options) check above
-            max_foldsets = [k for k, v in foldset2key_count.items() if v==max_v]
-            max_foldset2key_counts = {k:v for k, v in foldset2key_count.items() if v==max_v}
+                if ignore_reaction_versions:
+                    _foldset_rules = _foldset_rules.versionless
 
-            if len(max_foldsets)>0:
+                foldset2key_count[foldset] = len(getattr(_foldset_rules, key_to_maximize))
+
+            max_v = max(foldset2key_count.values()) 
+            max_foldsets = [k for k, v in foldset2key_count.items() if v==max_v and max_v>0]
+            max_foldset2key_counts = {k:v for k, v in foldset2key_count.items() if v==max_v and max_v>0}
+            
+            print("+++++++++++++++++")
+            pprint(f"foldset2key_count: {foldset2key_count}")
+            print(f"max_v: {max_v}")
+            pprint(f"max_foldsets:\n\t{max_foldsets}")
+            if max_v>0:
                 break
         
-        return max_foldset2key_counts #max_foldsets
+        return max_foldset2key_counts
 
     def loop_through_remaining_foldsets_look_ahead(self, size2foldsets, current, key_to_maximize, debug=False, ignore_reaction_versions=False):
         """
@@ -603,6 +616,8 @@ class FoldMetabolism:
 
                 if key_to_maximize == "rns" and ignore_reaction_versions:
                     n_new_set = len(get_versionless_reactions(effects.rns) - get_versionless_reactions(current.rns))
+                elif key_to_maximize == "rules" and ignore_reaction_versions:
+                    n_new_set = len(set(effects.rules.versionless) - set(current.rules.versionless))
                 else:
                     n_new_set = len(set(getattr(effects, key_to_maximize)) - set(getattr(current, key_to_maximize)))
 
@@ -621,17 +636,17 @@ class FoldMetabolism:
                     print("n_new_set: ", n_new_set)
                     print("~"*40)
 
-                if n_new_set == max_v:
+                if (n_new_set == max_v) and (max_v > 0):
                     max_effects[foldset] = effects
                 elif n_new_set > max_v:
                     max_v = n_new_set
                     max_effects = dict()
                     max_effects[foldset] = effects
-                else: # n_new < max_v
+                else: # n_new < max_v or n_new == max_v == 0
                     pass
 
             ## Don't look for longer rules if shorter rules enable new reactions
-            if len(max_effects)>0:
+            if max_v>0:
                 break
         return max_effects
 

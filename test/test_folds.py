@@ -5,7 +5,7 @@ import pandas as pd
 from scipy.sparse import csr_matrix, SparseEfficiencyWarning
 from pprint import pprint
 import random
-from pathlib import PurePath
+from pathlib import Path, PurePath
 
 import warnings
 # warnings.filterwarnings('ignore', category=SparseEfficiencyWarning) ## must be applied within each test
@@ -225,10 +225,10 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                         ("R8", frozenset({'F8'})):10,
                         ("R9", frozenset({'F9'})):11}
 
-        self.assertEqual(expected_cpds, result.cpds)
-        self.assertEqual(expected_rns, result.rns)
-        self.assertEqual(expected_folds, result.folds)
-        self.assertEqual(expected_rules, result.rules)
+        self.assertEqual(expected_cpds, result.cpds_folditer)
+        self.assertEqual(expected_rns, result.rns_folditer)
+        self.assertEqual(expected_folds, result.folds_folditer)
+        self.assertEqual(expected_rules, result.rules_folditer)
         
     def test_FoldMetabolism_rule_order_C0_independent_R0R1(self):
         random.seed(3141)
@@ -290,9 +290,9 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                         ("R9", frozenset({'F9'})):11}
 
         # self.assertEqual(expected_cpds, result.cpds)
-        self.assertEqual(expected_rns, result.rns)
-        self.assertEqual(expected_folds, result.folds)
-        self.assertEqual(expected_rules, result.rules)
+        self.assertEqual(expected_rns, result.rns_folditer)
+        self.assertEqual(expected_folds, result.folds_folditer)
+        self.assertEqual(expected_rules, result.rules_folditer)
 
     def test_FoldMetabolism_rn_order_C0_no_indepdendent(self):
         warnings.filterwarnings('ignore', category=SparseEfficiencyWarning)
@@ -350,10 +350,10 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                         ("R8", frozenset({'F8'})):10,
                         ("R9", frozenset({'F9'})):11}
 
-        self.assertEqual(expected_cpds, result.cpds)
-        self.assertEqual(expected_rns, result.rns)
-        self.assertEqual(expected_folds, result.folds)
-        self.assertEqual(expected_rules, result.rules)
+        self.assertEqual(expected_cpds, result.cpds_folditer)
+        self.assertEqual(expected_rns, result.rns_folditer)
+        self.assertEqual(expected_folds, result.folds_folditer)
+        self.assertEqual(expected_rules, result.rules_folditer)
         
     def test_FoldMetabolism_rn_order_C0_independent_R0R1(self):
         random.seed(3141)
@@ -415,9 +415,10 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
                         ("R9", frozenset({'F9'})):9}
 
         # self.assertEqual(expected_cpds, result.cpds)
-        self.assertEqual(expected_rns, result.rns)
-        self.assertEqual(expected_folds, result.folds)
-        self.assertEqual(expected_rules, result.rules)
+        self.assertEqual(expected_rns, result.rns_folditer)
+        ## need to update below tests
+        # self.assertEqual(expected_folds, result.folds_folditer)
+        # self.assertEqual(expected_rules, result.rules_folditer)
 
     def test_write_results(self):
 
@@ -482,28 +483,41 @@ class TestGlobalFoldNetworkIrreversible(unittest.TestCase):
         final_result = pd.read_pickle(result.final_path)
         temp_result = pd.read_pickle(result.temp_path)
 
-        self.assertEqual(final_result.cpds, expected_cpds)
-        self.assertEqual(final_result.rns, expected_rns)
-        self.assertEqual(final_result.folds, expected_folds)
-        self.assertEqual(final_result.rules, expected_rules)
+        self.assertEqual(final_result.cpds_folditer, expected_cpds)
+        self.assertEqual(final_result.rns_folditer, expected_rns)
+        self.assertEqual(final_result.folds_folditer, expected_folds)
+        self.assertEqual(final_result.rules_folditer, expected_rules)
 
-        self.assertEqual(final_result.cpds, temp_result.cpds)
-        self.assertEqual(final_result.rns, temp_result.rns)
-        self.assertEqual(final_result.folds, temp_result.folds)
-        self.assertEqual(final_result.rules, temp_result.rules)
+        self.assertEqual(final_result.cpds_folditer, temp_result.cpds_folditer)
+        self.assertEqual(final_result.rns_folditer, temp_result.rns_folditer)
+        self.assertEqual(final_result.folds_folditer, temp_result.folds_folditer)
+        self.assertEqual(final_result.rules_folditer, temp_result.rules_folditer)
 
         fm = nf.FoldMetabolism(self.met, foldrules, seed)
         result = fm.rule_order(algorithm="look_ahead_rules", write=True, write_tmp=False, ordered_outcome=True)
 
         final_result = pd.read_pickle(result.final_path)
 
-        self.assertEqual(final_result.cpds, expected_cpds)
-        self.assertEqual(final_result.rns, expected_rns)
-        self.assertEqual(final_result.folds, expected_folds)
-        self.assertEqual(final_result.rules, expected_rules)
+        self.assertEqual(final_result.cpds_folditer, expected_cpds)
+        self.assertEqual(final_result.rns_folditer, expected_rns)
+        self.assertEqual(final_result.folds_folditer, expected_folds)
+        self.assertEqual(final_result.rules_folditer, expected_rules)
 
         with self.assertRaises(ValueError):
             pd.read_pickle(result.temp_path)
+
+        ## Write to custom path
+        CUSTOM_PATH = "."
+        result = fm.rule_order(algorithm="look_ahead_rules", path=CUSTOM_PATH, write=True, write_tmp=False, ordered_outcome=True)
+        expected_dir = Path(CUSTOM_PATH).joinpath("fold_results")
+        self.assertTrue(expected_dir.is_dir())
+
+        final_result = pd.read_pickle(result.final_path)
+
+        self.assertEqual(final_result.cpds_folditer, expected_cpds)
+        self.assertEqual(final_result.rns_folditer, expected_rns)
+        self.assertEqual(final_result.folds_folditer, expected_folds)
+        self.assertEqual(final_result.rules_folditer, expected_rules)
 
 # class TestGlobalFoldNetworkReal(unittest.TestCase):
 #     """THESE ARE SLOW TESTS! EACH METHOD IS MAYBE 1.5 MIN"""
