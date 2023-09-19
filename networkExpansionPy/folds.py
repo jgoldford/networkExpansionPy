@@ -237,7 +237,7 @@ class Result:
         if path==None:
             path = Path.joinpath(Path.cwd(), "fold_results", fname)
         else:
-            path = Path.joinpath(path, "fold_results", fname)
+            path = Path.joinpath(Path(path), "fold_results", fname)
 
         return path
 
@@ -259,15 +259,16 @@ class Result:
         path = self.get_path(path, str_to_append_to_fname)
         
         i = 0
-        while path.is_file():
-            path = Path.joinpath(path.parent, path.stem+"_"+str(i)+path.suffix)
+        newpath = path
+        while newpath.is_file():
+            newpath = Path.joinpath(path.parent, path.name.removesuffix(".pkl.gz")+"_"+str(i)+".pkl.gz")
             i+=1
 
-        path.parent.mkdir(parents=True, exist_ok=True) 
-        with gzip.open(path, 'wb') as handle:
+        newpath.parent.mkdir(parents=True, exist_ok=True) 
+        with gzip.open(newpath, 'wb') as handle:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        self.final_path = str(path)
+        self.final_path = str(newpath)
         print("Final results written to:\n{}".format(self.final_path))
 
 class Rule:
