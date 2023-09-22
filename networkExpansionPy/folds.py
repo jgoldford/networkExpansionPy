@@ -654,6 +654,9 @@ class FoldMetabolism:
                 else: # n_new < max_v or n_new == max_v == 0
                     pass
 
+            print("+++++++++++++++++")
+            print(f"max_v: {max_v}")
+            print(f"max_foldsets:\n\t{list(max_effects.keys())}")
             ## Don't look for longer rules if shorter rules enable new reactions
             if max_v>0:
                 break
