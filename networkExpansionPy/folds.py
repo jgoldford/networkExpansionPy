@@ -164,6 +164,7 @@ class Result:
 
         self.max_effects = dict()
         self.size2foldsets = dict()
+        self.eq_best_folds = dict()
 
     def first_update(self, current, metadata=None, write=False, path=None, str_to_append_to_fname=None):
         self.update_cpds(current)
@@ -177,9 +178,10 @@ class Result:
         self.update_iter()
         self.update_folds(current)
         self.update_rules(current)
-        if metadata.max_effects != None: self.update_max_effects(metadata)
-        if metadata.size2foldsets != None: self.update_size2foldsets(metadata)
-        if metadata.eq_best_folds != None: self.update_eq_best_folds(metadata)
+        if metadata != None:
+            if metadata.max_effects != None: self.update_max_effects(metadata)
+            if metadata.size2foldsets != None: self.update_size2foldsets(metadata)
+            if metadata.eq_best_folds != None: self.update_eq_best_folds(metadata)
         self.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
     def update_cpds(self, current):
@@ -580,9 +582,9 @@ class FoldMetabolism:
             max_foldset2key_counts = {k:v for k, v in foldset2key_count.items() if v==max_v and max_v>0}
             
             print("+++++++++++++++++")
-            pprint(f"foldset2key_count: {foldset2key_count}")
+            # pprint(f"foldset2key_count: {foldset2key_count}")
             print(f"max_v: {max_v}")
-            pprint(f"max_foldsets:\n\t{max_foldsets}")
+            print(f"max_foldsets:\n\t{max_foldsets}")
             if max_v>0:
                 break
         
