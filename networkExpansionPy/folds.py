@@ -105,6 +105,7 @@ class Metadata:
     def __init__(self):
         self.size2foldsets = None
         self.max_effects = None
+        self.eq_best_folds = None
 
 class Result:
     """
@@ -163,6 +164,7 @@ class Result:
 
         self.max_effects = dict()
         self.size2foldsets = dict()
+        self.eq_best_folds = dict()
 
     def first_update(self, current, metadata=None, write=False, path=None, str_to_append_to_fname=None):
         self.update_cpds(current)
@@ -177,8 +179,9 @@ class Result:
         self.update_folds(current)
         self.update_rules(current)
         if metadata != None:
-            self.update_max_effects(metadata)
-            self.update_size2foldsets(metadata)
+            if metadata.max_effects != None: self.update_max_effects(metadata)
+            if metadata.size2foldsets != None: self.update_size2foldsets(metadata)
+            if metadata.eq_best_folds != None: self.update_eq_best_folds(metadata)
         self.first_update(current, write=write, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
     def update_cpds(self, current):
@@ -220,6 +223,9 @@ class Result:
 
     def update_size2foldsets(self, metadata):
         self.size2foldsets[self.iteration] = metadata.size2foldsets
+
+    def update_eq_best_folds(self, metadata):
+        self.eq_best_folds[self.iteration] = metadata.eq_best_folds
 
     def update_iter(self):
         self.iteration+=1
@@ -464,15 +470,18 @@ class FoldMetabolism:
         """
         print("calculating scope...")
         rn_tup_set = set(self.m.rxns2tuple((self.f.rns | self.seed.rns)))
-        scope_cpds, scope_rns = self.m.expand(seed.cpds, reaction_mask=rn_tup_set)
+        compound_iteration_dict, reaction_iteration_dict = self.m.expand(seed.cpds, reaction_mask=rn_tup_set, algorithm="trace")
 
         scope = Params()
-        scope.cpds = set(scope_cpds)
-        scope.rns = set([i[0] for i in scope_rns])
+        scope.cpd_iteration_dict, scope.rn_iteration_dict = compound_iteration_dict, {k[0]:v for k,v in reaction_iteration_dict.items()}
+        scope.cpds, scope.rns = set(scope.cpd_iteration_dict.keys()), set(scope.rn_iteration_dict.keys())
+
+        # scope.cpds = set(scope_cpds)
+        # scope.rns = set([i[0] for i in scope_rns])
         scope.rules = self.f.subset_from_rns(scope.rns)
         scope.folds = scope.rules.folds 
         print("...done.")
-        return ImmutableParams(folds=scope.folds, rns=scope.rns, rules=scope.rules, cpds=scope.cpds)
+        return ImmutableParams(folds=scope.folds, rns=scope.rns, rules=scope.rules, cpds=scope.cpds, cpd_iteration_dict=scope.cpd_iteration_dict, rn_iteration_dict=scope.rn_iteration_dict)
 
     def fold_expand(self, folds, current_cpds, fold_algorithm="trace"):
         """
@@ -573,9 +582,9 @@ class FoldMetabolism:
             max_foldset2key_counts = {k:v for k, v in foldset2key_count.items() if v==max_v and max_v>0}
             
             print("+++++++++++++++++")
-            pprint(f"foldset2key_count: {foldset2key_count}")
+            # pprint(f"foldset2key_count: {foldset2key_count}")
             print(f"max_v: {max_v}")
-            pprint(f"max_foldsets:\n\t{max_foldsets}")
+            print(f"max_foldsets:\n\t{max_foldsets}")
             if max_v>0:
                 break
         
@@ -645,6 +654,9 @@ class FoldMetabolism:
                 else: # n_new < max_v or n_new == max_v == 0
                     pass
 
+            print("+++++++++++++++++")
+            print(f"max_v: {max_v}")
+            print(f"max_foldsets:\n\t{list(max_effects.keys())}")
             ## Don't look for longer rules if shorter rules enable new reactions
             if max_v>0:
                 break
@@ -811,7 +823,17 @@ class FoldMetabolism:
         else:
             return True
 
-    def rule_order(self, algorithm, write=False, write_tmp=False, path=None, str_to_append_to_fname=None, debug=False, ordered_outcome=False, ignore_reaction_versions=False):
+    def rule_order(
+        self, 
+        algorithm, 
+        write=False, 
+        write_tmp=False, 
+        path=None, 
+        str_to_append_to_fname=None, 
+        debug=False, 
+        ordered_outcome=False, 
+        ignore_reaction_versions=False,
+        write_max_effects = False):
         """
         Determine the ordering of all rules/folds.
 
@@ -862,7 +884,8 @@ class FoldMetabolism:
                 current.rns = effects.rns
                 current.rn_iteration_dict = effects.rn_iteration_dict
                 current.rules = self.scope.rules.subset_from_folds(current.folds).subset_from_rns(current.rns)
-                metadata.max_effects = max_effects
+                if write_max_effects: metadata.max_effects = max_effects 
+                metadata.eq_best_folds = set(max_effects.keys())
                 metadata.size2foldsets = size2foldsets
 
             ## Store when cpds and rns appear in the expansion
