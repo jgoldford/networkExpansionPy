@@ -8,6 +8,7 @@ import random
 import pickle
 import gzip
 import re
+from collections import defaultdict
 
 asset_path = PurePath(__file__).parent / "assets"
 
@@ -31,13 +32,14 @@ class ImmutableParams:
     After initialization attributes are immutable, to avoid unintentionally changing parameters like the seed or scope.
     """
 
-    def __init__(self, folds=None, cpds=None, cpd_iteration_dict=None, rns=None, rn_iteration_dict=None, rules=None):
+    def __init__(self, folds=None, cpds=None, cpd_iteration_dict=None, rns=None, rn_iteration_dict=None, rules=None, rule_iteration_dict=None):
         self._folds = deepcopy(folds)
         self._cpds = deepcopy(cpds)
         self._cpd_iteration_dict = deepcopy(cpd_iteration_dict)
         self._rns = deepcopy(rns)
         self._rn_iteration_dict = deepcopy(rn_iteration_dict)
         self._rules = deepcopy(rules)
+        self._rule_iteration_dict = deepcopy(rule_iteration_dict)
 
     @property
     def folds(self):
@@ -62,6 +64,10 @@ class ImmutableParams:
     @property
     def rules(self):
         return self._rules
+
+    @property
+    def rule_iteration_dict(self):
+        return self._rule_iteration_dict
 
 class Params(ImmutableParams):
     """
@@ -93,6 +99,10 @@ class Params(ImmutableParams):
     @ImmutableParams.rules.setter
     def rules(self, value):
         self._rules = deepcopy(value)
+
+    @ImmutableParams.rule_iteration_dict.setter
+    def rule_iteration_dict(self, value):
+        self._rule_iteration_dict = deepcopy(value)
 
 class Metadata:
     """
@@ -155,6 +165,7 @@ class Result:
         self.folds_cumiter = {"fold_independent":0}
         # self.rules = dict() # activated; not simply possible
         self.rules_folditer = dict()
+        self.rules_subiter = dict()
         self.rules_cumiter = dict()
         self.start_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.start_time = timeit.default_timer()
@@ -209,11 +220,13 @@ class Result:
                 self.folds_cumiter[i] = self.iteration_cum+1 #+ self.rns_subiter[self.iteration][i]
 
     def update_rules(self, current):
+        if len(set(current.rule_iteration_dict.keys()) - set(self.rules_folditer.keys())) != 0:
+            self.rules_subiter[self.iteration] = deepcopy(current.rule_iteration_dict)
+
         for i in current.rules.ids:
             if i not in self.rules_folditer:
-                # self.rules[i] = self.iteration
                 self.rules_folditer[i] = self.iteration
-                self.rules_cumiter[i] = self.iteration_cum+1
+                self.rules_cumiter[i] = self.iteration_cum + self.rules_subiter[self.iteration][i]#+1
 
     def update_iteration_time(self):
         self.iteration_time[self.iteration] =  timeit.default_timer() - self.start_time
@@ -502,7 +515,14 @@ class FoldMetabolism:
         rn_tup_set = set(self.m.rxns2tuple(possible_rules.rns | self.seed.rns))
         if fold_algorithm=="trace":
             compound_iteration_dict, reaction_iteration_dict = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, reaction_mask=rn_tup_set)
-            return compound_iteration_dict, {k[0]:v for k,v in reaction_iteration_dict.items()}#set(cx), set([i[0] for i in rx])
+            
+            reaction_iteration_dict_no_direction = defaultdict(set)
+            for k,v in reaction_iteration_dict.items():
+                reaction_iteration_dict_no_direction[k[0]].add(v)
+            reaction_iteration_dict_new = {k:min(v) for k,v in reaction_iteration_dict_no_direction.items()} # make sure to only count the first iteration where a reaction gets added
+            
+            return compound_iteration_dict, reaction_iteration_dict_new#set(cx), set([i[0] for i in rx])
+        
         elif fold_algorithm=="step":
             cx,rx = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, reaction_mask=rn_tup_set)
             return set(cx), set([i[0] for i in rx])
@@ -823,6 +843,19 @@ class FoldMetabolism:
         else:
             return True
 
+    def build_current_rule_iteration_dict(self, current):
+        rule_iteration_dict = {}
+        rns_through_ri = dict()
+        for ri in sorted(set(current.rn_iteration_dict.values())):
+            rns_through_ri[ri] = []
+            for k,v in current.rn_iteration_dict.items():
+                if v<=ri:
+                    rns_through_ri[ri].append(k)
+            for rule in self.scope.rules.subset_from_folds(current.folds).subset_from_rns(set(rns_through_ri[ri])):
+                if rule.id not in rule_iteration_dict:
+                    rule_iteration_dict[rule.id] = ri
+        return rule_iteration_dict
+
     def rule_order(
         self, 
         algorithm, 
@@ -848,6 +881,8 @@ class FoldMetabolism:
         Returns:
             A `Result` object that stores the results of the rule/fold ordering algorithm.
         """
+        print("Modified reaction iteration dict")
+
         ## Place to store results and current state of expansion
         ## ITERATION 0 (Avoid updating folds on the 0th iteration since they don't apply until iteration=1)
         result = Result(self.scope)
@@ -860,6 +895,7 @@ class FoldMetabolism:
         ## ITERATION 1 (using only seed folds and fold independent reactions)
         current.cpd_iteration_dict, current.rn_iteration_dict = self.fold_expand(current.folds, current.cpds)
         current.cpds, current.rns = set(current.cpd_iteration_dict.keys()), set(current.rn_iteration_dict.keys())
+        current.rule_iteration_dict = self.build_current_rule_iteration_dict(current)
         current.rules = self.scope.rules.subset_from_folds(current.folds).subset_from_rns(current.rns)
         result.update(current, write=write_tmp, path=path, str_to_append_to_fname=str_to_append_to_fname)
 
@@ -884,6 +920,7 @@ class FoldMetabolism:
                 current.rns = effects.rns
                 current.rn_iteration_dict = effects.rn_iteration_dict
                 current.rules = self.scope.rules.subset_from_folds(current.folds).subset_from_rns(current.rns)
+                current.rule_iteration_dict = self.build_current_rule_iteration_dict(current)
                 if write_max_effects: metadata.max_effects = max_effects 
                 metadata.eq_best_folds = set(max_effects.keys())
                 metadata.size2foldsets = size2foldsets
