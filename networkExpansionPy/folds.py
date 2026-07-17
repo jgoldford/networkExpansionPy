@@ -470,7 +470,9 @@ class FoldMetabolism:
         """
         print("calculating scope...")
         rn_tup_set = set(self.m.rxns2tuple((self.f.rns | self.seed.rns)))
-        compound_iteration_dict, reaction_iteration_dict = self.m.expand(seed.cpds, reaction_mask=rn_tup_set, algorithm="trace")
+        all_rxns = set(self.m.rxns2tuple(self.m.network["rn"].unique()))
+        excluded = all_rxns - rn_tup_set
+        compound_iteration_dict, reaction_iteration_dict = self.m.expand(seed.cpds, excluded_reactions=excluded, algorithm="trace")
 
         scope = Params()
         scope.cpd_iteration_dict, scope.rn_iteration_dict = compound_iteration_dict, {k[0]:v for k,v in reaction_iteration_dict.items()}
@@ -500,11 +502,13 @@ class FoldMetabolism:
 
         possible_rules = self.f.subset_from_folds(folds)
         rn_tup_set = set(self.m.rxns2tuple(possible_rules.rns | self.seed.rns))
+        all_rxns = set(self.m.rxns2tuple(self.m.network["rn"].unique()))
+        excluded = all_rxns - rn_tup_set
         if fold_algorithm=="trace":
-            compound_iteration_dict, reaction_iteration_dict = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, reaction_mask=rn_tup_set)
+            compound_iteration_dict, reaction_iteration_dict = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, excluded_reactions=excluded)
             return compound_iteration_dict, {k[0]:v for k,v in reaction_iteration_dict.items()}#set(cx), set([i[0] for i in rx])
         elif fold_algorithm=="step":
-            cx,rx = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, reaction_mask=rn_tup_set)
+            cx,rx = self.m.expand(current_cpds | self.seed.cpds, algorithm=fold_algorithm, excluded_reactions=excluded)
             return set(cx), set([i[0] for i in rx])
 
     def sort_remaining_foldsets_by_size(self, current_folds):

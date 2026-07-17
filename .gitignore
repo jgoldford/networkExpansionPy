@@ -90,3 +90,4 @@ ipython_config.py
 
 # pkl files that might show up when running tests
 test/*/*.pkl
+fold_results/
